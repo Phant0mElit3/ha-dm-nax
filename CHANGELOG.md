@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.7
+
+- Fixes the current-HA Options crash, validates 5-300 second polling intervals,
+  and reloads automatically when options change.
+- Adds credential repair and connection reconfiguration with device-identity
+  checks. Distinguishes connection failures from authentication failures.
+- Bounds individual network requests to 10 seconds, serializes authentication
+  and writes, retries expired sessions once, and releases managed sessions
+  without closing HA's shared connector.
+- Corrects channel-family discovery and write paths, including AmpOutput, and
+  suppresses read-only channel mute-level controls.
+- Uses reported speaker power maxima and basic audio ranges.
+- Limits the visibility migration to direct common controls and runs it once,
+  preserving user choices and advanced PEQ defaults.
+- Tracks capability changes after setup, discovers newly supported controls,
+  and rejects writes to controls no longer applicable.
+- Reports unsupported and restart-required Crestron action results explicitly.
+- Gives duplicate source names unique labels and avoids source writes without
+  a reported route.
+- Reduces volume optimism from 30 to 2 seconds, honors new device feedback and
+  configured limits, and protects rapid-command feedback from older completions.
+- Includes original bundled brand icons for HACS/HA and regression tests.
+- Preserves zone renaming and existing entity IDs. Fully restart HA after update.
+
 ## 0.2.6
 
 - Adds enabled configuration text entities such as `Zone2 Name` for renaming

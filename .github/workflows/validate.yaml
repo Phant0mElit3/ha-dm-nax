@@ -8,7 +8,7 @@ on:
 
 jobs:
   tests:
-    name: Entity registration tests
+    name: Integration regression tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,7 +22,7 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r requirements-test.txt
 
-      - name: Test zone entity registration
+      - name: Test integration behavior and entity registration
         run: python -m pytest -q
 
   hacs:

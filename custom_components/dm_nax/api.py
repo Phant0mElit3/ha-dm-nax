@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import asyncio
 import logging
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-from aiohttp import ClientError, ClientResponse, ClientSession
+from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +30,10 @@ class DmNaxAuthError(DmNaxApiError):
     """Raised when DM NAX authentication fails."""
 
 
+class DmNaxUnsupportedObjectError(DmNaxApiError):
+    """Raised when a device does not implement an object."""
+
+
 class DmNaxApi:
     """Small async client for DM NAX devices."""
 
@@ -41,6 +46,7 @@ class DmNaxApi:
         *,
         use_ssl: bool = True,
         verify_ssl: bool = False,
+        owns_session: bool = False,
     ) -> None:
         self._session = session
         self._host = _normalize_host(host)
@@ -50,6 +56,9 @@ class DmNaxApi:
         self._verify_ssl = verify_ssl
         self._xsrf_token: str | None = None
         self._authenticated = False
+        self._owns_session = owns_session
+        self._request_lock = asyncio.Lock()
+        self._timeout = ClientTimeout(total=10, connect=5)
 
     @property
     def base_url(self) -> str:
@@ -57,52 +66,74 @@ class DmNaxApi:
         return f"{self._scheme}://{self._host}"
 
     async def async_close(self) -> None:
-        """Close the underlying session if Home Assistant has not already done so."""
+        """Release our session without closing Home Assistant's shared connector."""
         if not self._session.closed:
-            await self._session.close()
+            if self._owns_session:
+                await self._session.close()
+            else:
+                self._session.detach()
 
     async def async_login(self) -> None:
         """Begin an authenticated DM NAX web session."""
+        async with self._request_lock:
+            await self._async_login()
+
+    async def _async_login(self) -> None:
+        """Authenticate while holding the request lock."""
+        self._authenticated = False
+        self._xsrf_token = None
         login_url = f"{self.base_url}/userlogin.html"
         headers = self._browserish_headers()
         try:
-            get_response = await self._session.get(
-                login_url,
-                headers=headers,
-                ssl=self._verify_ssl,
-            )
-            async with get_response:
-                await get_response.read()
-            response = await self._session.post(
+            async with await self._session.get(
+                login_url, headers=headers, ssl=self._verify_ssl, timeout=self._timeout
+            ) as response:
+                if response.status >= 400:
+                    raise await _response_error(response)
+                await response.read()
+            async with await self._session.post(
                 login_url,
                 data={"login": self._username, "passwd": self._password},
                 headers=headers,
                 allow_redirects=False,
                 ssl=self._verify_ssl,
-            )
-        except ClientError as err:
-            raise DmNaxAuthError(f"Unable to connect to DM NAX device: {err}") from err
+                timeout=self._timeout,
+            ) as response:
+                if response.status not in (200, 302):
+                    raise await _response_error(response)
+                if response.status == 302 and response.headers.get("Location") not in (
+                    None,
+                    "/",
+                ):
+                    raise DmNaxAuthError("DM NAX login returned an unexpected redirect")
+                self._xsrf_token = response.headers.get("CREST-XSRF-TOKEN")
+                await response.read()
+                self._authenticated = True
+        except (ClientError, TimeoutError) as err:
+            raise DmNaxApiError("Unable to connect to DM NAX device") from err
 
-        async with response:
-            if response.status not in (200, 302):
-                raise DmNaxAuthError(f"DM NAX login failed with HTTP {response.status}")
-            if response.status == 302 and response.headers.get("Location") not in (None, "/"):
-                raise DmNaxAuthError("DM NAX login returned an unexpected redirect")
-            self._xsrf_token = response.headers.get("CREST-XSRF-TOKEN")
-            self._authenticated = True
-            _LOGGER.debug("Authenticated to DM NAX host %s", self._host)
+    async def _async_optional_object(self, key: str) -> dict[str, Any]:
+        """Ignore only a confirmed unsupported endpoint, never a transport failure."""
+        try:
+            result = await self.async_get(READ_ENDPOINTS[key])
+            _raise_for_action_results(result)
+            return result
+        except DmNaxUnsupportedObjectError:
+            return {}
 
     async def async_get_inventory(self) -> dict[str, Any]:
-        """Fetch the DM NAX objects used by Home Assistant entities."""
-        inventory: dict[str, Any] = {}
-        for key, path in READ_ENDPOINTS.items():
-            try:
-                inventory[key] = await self.async_get(path)
-            except DmNaxApiError:
-                if key not in {"input_channels", "output_channels"}:
-                    raise
-                _LOGGER.debug("Optional DM NAX object %s is unavailable", path)
-                inventory[key] = {}
+        """Fetch state using the zone or channel object family actually available."""
+        inventory = {"device_info": await self.async_get(READ_ENDPOINTS["device_info"])}
+        for primary, alternate, object_name, child in (
+            ("input_sources", "input_channels", "InputSources", "Inputs"),
+            ("zone_outputs", "output_channels", "ZoneOutputs", "Zones"),
+        ):
+            payload = await self._async_optional_object(primary)
+            inventory[primary] = payload
+            if not payload.get("Device", {}).get(object_name, {}).get(child):
+                inventory[alternate] = await self._async_optional_object(alternate)
+        for key in ("av_matrix_routing", "audio_ranges"):
+            inventory[key] = await self._async_optional_object(key)
         return inventory
 
     async def async_get(self, path: str) -> dict[str, Any]:
@@ -115,20 +146,30 @@ class DmNaxApi:
         _raise_for_action_results(result)
         return result
 
-    async def async_set_output_volume(self, channel_id: str, volume: int) -> dict[str, Any]:
+    async def async_set_output_volume(
+        self, channel_id: str, volume: int
+    ) -> dict[str, Any]:
         """Set output channel volume, where 0 is 0% and 1000 is 100%."""
         value = max(0, min(1000, int(volume)))
         if channel_id.startswith("Zone"):
-            return await self.async_post_device(_zone_audio_payload(channel_id, {"Volume": value}))
-        return await self.async_post_device(_output_channel_payload(channel_id, {"Volume": value}))
+            return await self.async_post_device(
+                _zone_audio_payload(channel_id, {"Volume": value})
+            )
+        return await self.async_post_device(
+            _output_channel_payload(channel_id, {"Volume": value})
+        )
 
-    async def async_set_output_mute(self, channel_id: str, muted: bool) -> dict[str, Any]:
+    async def async_set_output_mute(
+        self, channel_id: str, muted: bool
+    ) -> dict[str, Any]:
         """Set output channel mute state."""
         if channel_id.startswith("Zone"):
             return await self.async_post_device(
                 _zone_audio_payload(channel_id, {"IsMuted": bool(muted)})
             )
-        return await self.async_post_device(_output_channel_payload(channel_id, {"IsMuted": bool(muted)}))
+        return await self.async_post_device(
+            _output_channel_payload(channel_id, {"IsMuted": bool(muted)})
+        )
 
     async def async_set_zone_audio_value(
         self,
@@ -150,7 +191,9 @@ class DmNaxApi:
     ) -> dict[str, Any]:
         """Set one zone property, including nested properties outside ZoneAudio."""
         path = (key,) if isinstance(key, str) else tuple(key)
-        return await self.async_post_device(_zone_payload(zone_id, _nested_payload(path, value)))
+        return await self.async_post_device(
+            _zone_payload(zone_id, _nested_payload(path, value))
+        )
 
     async def async_set_audio_source(
         self,
@@ -164,12 +207,22 @@ class DmNaxApi:
                     "AvMatrixRouting": {
                         "Routes": {
                             route_id: {
-                                "AudioSource": "" if audio_source is None else audio_source,
+                                "AudioSource": ""
+                                if audio_source is None
+                                else audio_source,
                             }
                         }
                     }
                 }
             }
+        )
+
+    async def async_set_channel_value(
+        self, channel_id: str, path: Sequence[str], value: Any
+    ) -> dict[str, Any]:
+        """Set a writable OutputChannels property."""
+        return await self.async_post_device(
+            _output_channel_payload(channel_id, _nested_payload(path, value))
         )
 
     async def _request(
@@ -180,53 +233,54 @@ class DmNaxApi:
         json_payload: dict[str, Any] | None = None,
         retry_auth: bool = True,
     ) -> dict[str, Any]:
-        """Make an authenticated DM NAX request."""
-        if not self._authenticated:
-            await self.async_login()
-
-        url = f"{self.base_url}{path if path.startswith('/') else f'/{path}'}"
-        headers = self._browserish_headers()
-        if method == "POST":
-            if not self._xsrf_token:
-                raise DmNaxAuthError("DM NAX login did not return an XSRF token")
-            headers["X-CREST-XSRF-TOKEN"] = self._xsrf_token
-
-        try:
-            response = await self._session.request(
-                method,
-                url,
-                headers=headers,
-                json=json_payload,
-                ssl=self._verify_ssl,
-            )
-        except ClientError as err:
-            raise DmNaxApiError(f"DM NAX request failed: {err}") from err
-
-        async with response:
-            if response.status == 403 and retry_auth:
-                self._authenticated = False
-                self._xsrf_token = None
-                await self.async_login()
-                return await self._request(
-                    method,
-                    path,
-                    json_payload=json_payload,
-                    retry_auth=False,
-                )
-            if response.status < 200 or response.status >= 300:
-                raise await _response_error(response)
-            if method == "POST" and response.headers.get("CREST-XSRF-TOKEN"):
-                self._xsrf_token = response.headers["CREST-XSRF-TOKEN"]
-            if response.content_length == 0:
-                return {}
+        """Serialize requests so credentials, XSRF tokens and writes stay ordered."""
+        async with self._request_lock:
             try:
-                payload = await response.json(content_type=None)
-            except Exception as err:  # noqa: BLE001 - response body diagnostics matter here.
-                text = await response.text()
-                raise DmNaxApiError(f"DM NAX returned non-JSON response: {text}") from err
-            if not isinstance(payload, dict):
-                raise DmNaxApiError("DM NAX returned an unexpected JSON payload")
-            return payload
+                for attempt in range(2 if retry_auth else 1):
+                    if not self._authenticated:
+                        await self._async_login()
+                    headers = self._browserish_headers()
+                    if method == "POST":
+                        if not self._xsrf_token:
+                            self._authenticated = False
+                            raise DmNaxAuthError(
+                                "DM NAX login did not return an XSRF token"
+                            )
+                        headers["X-CREST-XSRF-TOKEN"] = self._xsrf_token
+                    url = f"{self.base_url}/{path.lstrip('/')}"
+                    async with await self._session.request(
+                        method,
+                        url,
+                        headers=headers,
+                        json=json_payload,
+                        ssl=self._verify_ssl,
+                        timeout=self._timeout,
+                    ) as response:
+                        if response.status in (401, 403):
+                            self._authenticated = False
+                            self._xsrf_token = None
+                            if attempt == 0 and retry_auth:
+                                continue
+                        if not 200 <= response.status < 300:
+                            raise await _response_error(response)
+                        if token := response.headers.get("CREST-XSRF-TOKEN"):
+                            self._xsrf_token = token
+                        if response.content_length == 0:
+                            return {}
+                        try:
+                            payload = await response.json(content_type=None)
+                        except ValueError as err:
+                            raise DmNaxApiError(
+                                "DM NAX returned a non-JSON response"
+                            ) from err
+                        if not isinstance(payload, dict):
+                            raise DmNaxApiError(
+                                "DM NAX returned an unexpected JSON payload"
+                            )
+                        return payload
+            except (ClientError, TimeoutError) as err:
+                raise DmNaxApiError("DM NAX request failed or timed out") from err
+        raise DmNaxAuthError("DM NAX rejected the session")
 
     def _browserish_headers(self) -> dict[str, str]:
         """Return headers expected by the DM NAX web service."""
@@ -245,7 +299,9 @@ def _normalize_host(host: str) -> str:
     return value.strip("/")
 
 
-def _output_channel_payload(channel_id: str, values: Mapping[str, Any]) -> dict[str, Any]:
+def _output_channel_payload(
+    channel_id: str, values: Mapping[str, Any]
+) -> dict[str, Any]:
     """Build a narrow partial object for an output channel update."""
     return {
         "Device": {
@@ -302,13 +358,11 @@ def _nested_payload(path: Sequence[str], value: Any) -> dict[str, Any]:
 
 async def _response_error(response: ClientResponse) -> DmNaxApiError:
     """Build a useful error from an HTTP response."""
-    try:
-        text = await response.text()
-    except ClientError:
-        text = ""
-    if response.status == 403:
+    if response.status in (401, 403):
         return DmNaxAuthError("DM NAX rejected the credentials or session")
-    return DmNaxApiError(f"DM NAX request failed with HTTP {response.status}: {text}")
+    if response.status == 404:
+        return DmNaxUnsupportedObjectError("DM NAX object is not supported")
+    return DmNaxApiError(f"DM NAX request failed with HTTP {response.status}")
 
 
 def _raise_for_action_results(payload: dict[str, Any]) -> None:
@@ -317,6 +371,7 @@ def _raise_for_action_results(payload: dict[str, Any]) -> None:
     if not isinstance(actions, list):
         return
     failures: list[str] = []
+    statuses: list[int] = []
     for action in actions:
         if not isinstance(action, dict):
             continue
@@ -327,9 +382,16 @@ def _raise_for_action_results(payload: dict[str, Any]) -> None:
             if not isinstance(result, dict):
                 continue
             status_id = result.get("StatusId")
-            if isinstance(status_id, int) and (status_id < 0 or status_id == 3):
+            if isinstance(status_id, int) and status_id != 0:
+                statuses.append(status_id)
                 path = result.get("Path", "unknown path")
-                status = result.get("StatusInfo", "unknown error")
-                failures.append(f"{path}: {status}")
+                status = {
+                    1: "Accepted; device reboot required",
+                    2: "Accepted; application reset required",
+                    3: "Unsupported operation",
+                }.get(status_id, result.get("StatusInfo") or "unknown error")
+                failures.append(f"{path}: {status} ({result.get('Property', '')})")
     if failures:
+        if all(status == 3 for status in statuses):
+            raise DmNaxUnsupportedObjectError("; ".join(failures))
         raise DmNaxApiError("; ".join(failures))

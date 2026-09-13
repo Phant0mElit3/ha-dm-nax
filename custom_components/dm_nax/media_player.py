@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+from collections import Counter
 from time import monotonic
 from typing import Any
 
@@ -11,9 +13,10 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_call_later
 
 from .api import DmNaxApiError
 from .const import DOMAIN
@@ -21,7 +24,7 @@ from .coordinator import DmNaxCoordinator
 from .entity import DmNaxEntity
 
 DM_NAX_VOLUME_MAX = 1000
-OPTIMISTIC_VOLUME_TIMEOUT = 30
+OPTIMISTIC_VOLUME_TIMEOUT = 2
 
 
 async def async_setup_entry(
@@ -45,12 +48,17 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
         super().__init__(coordinator, item)
         self._optimistic_volume: int | None = None
         self._optimistic_volume_expires_at: float | None = None
+        self._volume_before_command: int | None = None
+        self._volume_generation = 0
+        self._cancel_volume_timer = None
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
         """Return supported features."""
-        features = MediaPlayerEntityFeature.VOLUME_SET | MediaPlayerEntityFeature.VOLUME_MUTE
-        if self.source_list:
+        features = (
+            MediaPlayerEntityFeature.VOLUME_SET | MediaPlayerEntityFeature.VOLUME_MUTE
+        )
+        if self.source_list and self.item.get("route_id"):
             features |= MediaPlayerEntityFeature.SELECT_SOURCE
         return features
 
@@ -100,8 +108,6 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
     def source(self) -> str | None:
         """Return the selected input source name."""
         item = self.item
-        if item.get("source_name") is not None:
-            return str(item["source_name"])
         source_id = item.get("source_id")
         if source_id is None:
             return None
@@ -110,19 +116,54 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
     @property
     def source_list(self) -> list[str]:
         """Return available input source names."""
-        return [
-            _input_name(item)
+        return list(self._source_labels.values())
+
+    @property
+    def _source_labels(self) -> dict[str, str]:
+        """Disambiguate duplicate names without collisions with literal labels."""
+        items = [
+            item
             for item in self.coordinator.data.get("input_channels", [])
             if item.get("id") is not None
         ]
+        counts = Counter(_input_name(item) for item in items)
+        labels = {}
+        reserved = {
+            _input_name(item) for item in items if counts[_input_name(item)] == 1
+        }
+        for item in items:
+            source_id, name = str(item["id"]), _input_name(item)
+            label = name
+            if counts[name] > 1:
+                label = f"{name} ({source_id})"
+                while label in reserved:
+                    label += f" ({source_id})"
+            reserved.add(label)
+            labels[source_id] = label
+        return labels
 
     async def async_set_volume_level(self, volume: float) -> None:
-        """Set output volume."""
-        level = round(max(0.0, min(1.0, float(volume))) * DM_NAX_VOLUME_MAX)
+        """Set output volume within both HA and device bounds."""
+        if not math.isfinite(volume):
+            raise HomeAssistantError("Volume must be a finite number")
+        minimum = max(0, int(self.item.get("MinVolume", 0)))
+        maximum = min(
+            DM_NAX_VOLUME_MAX, int(self.item.get("MaxVolume", DM_NAX_VOLUME_MAX))
+        )
+        level = max(minimum, min(maximum, round(volume * DM_NAX_VOLUME_MAX)))
+        self._volume_generation += 1
+        generation = self._volume_generation
+        before = self._polled_volume_raw
         try:
             await self.coordinator.api.async_set_output_volume(self._id, level)
         except DmNaxApiError as err:
+            if generation == self._volume_generation:
+                self._clear_optimistic_volume()
+                self.async_write_ha_state()
             raise HomeAssistantError(f"DM NAX volume command failed: {err}") from err
+        if generation != self._volume_generation:
+            return
+        self._volume_before_command = before
         self._set_optimistic_volume(level)
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
@@ -140,7 +181,9 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
         source_id = self._source_id_for_name(source)
         if source_id is None:
             raise HomeAssistantError(f"Unknown DM NAX source: {source}")
-        route_id = self.item.get("route_id") or self._id
+        route_id = self.item.get("route_id")
+        if route_id is None:
+            raise HomeAssistantError("DM NAX does not report a route for this output")
         try:
             await self.coordinator.api.async_set_audio_source(str(route_id), source_id)
         except DmNaxApiError as err:
@@ -149,27 +192,23 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
 
     def _source_id_for_name(self, name: str) -> str | None:
         """Return a route source id for a Home Assistant source name."""
-        for item in self.coordinator.data.get("input_channels", []):
-            if _input_name(item) == name:
-                return str(item.get("id"))
-        return None
+        return next(
+            (key for key, label in self._source_labels.items() if label == name), None
+        )
 
     def _source_name_for_id(self, source_id: str) -> str | None:
-        """Return a source display name for a route source id."""
+        """Use the same label for feedback and selection, including source aliases."""
         source = self.coordinator.data.get("inputs_by_source_id", {}).get(source_id)
-        if source:
-            return _input_name(source)
-        return source_id
+        key = str(source["id"]) if source else source_id
+        return self._source_labels.get(key, source_id)
 
     def _handle_coordinator_update(self) -> None:
         """Clear optimistic volume once DM NAX confirms it or the override expires."""
-        if (
-            self._optimistic_volume is not None
-            and (
-                self.item.get("Volume") == self._optimistic_volume
-                or self._polled_volume_raw == self._optimistic_volume
-                or self._optimistic_volume_expired
-            )
+        if self._optimistic_volume is not None and (
+            self.item.get("Volume") == self._optimistic_volume
+            or self._polled_volume_raw == self._optimistic_volume
+            or self._polled_volume_raw != self._volume_before_command
+            or self._optimistic_volume_expired
         ):
             self._clear_optimistic_volume()
         super()._handle_coordinator_update()
@@ -184,13 +223,32 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
 
     def _set_optimistic_volume(self, volume: int) -> None:
         """Temporarily reflect an accepted volume command before the next poll."""
+        if self._cancel_volume_timer is not None:
+            self._cancel_volume_timer()
         self._optimistic_volume = max(0, min(DM_NAX_VOLUME_MAX, int(volume)))
         self._optimistic_volume_expires_at = monotonic() + OPTIMISTIC_VOLUME_TIMEOUT
+        self._cancel_volume_timer = async_call_later(
+            self.hass, OPTIMISTIC_VOLUME_TIMEOUT, self._expire_volume
+        )
 
     def _clear_optimistic_volume(self) -> None:
         """Clear optimistic volume state."""
         self._optimistic_volume = None
         self._optimistic_volume_expires_at = None
+        if self._cancel_volume_timer is not None:
+            self._cancel_volume_timer()
+            self._cancel_volume_timer = None
+
+    @callback
+    def _expire_volume(self, _now) -> None:
+        """Return to authoritative state even when no poll has arrived."""
+        self._clear_optimistic_volume()
+        self.async_write_ha_state()
+        self.hass.async_create_task(self.coordinator.async_request_refresh())
+
+    async def async_will_remove_from_hass(self) -> None:
+        self._clear_optimistic_volume()
+        await super().async_will_remove_from_hass()
 
 
 def _input_name(item: dict[str, Any]) -> str:

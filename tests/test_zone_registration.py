@@ -1,12 +1,11 @@
 """Exercise zone controls through Home Assistant's real entity registry."""
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-
 from homeassistant import loader
 from homeassistant.bootstrap import async_load_base_functionality
 from homeassistant.config_entries import ConfigEntries
@@ -49,7 +48,12 @@ async def test_zone_controls_register(tmp_path, caplog, module, descriptions):
         coordinator = DmNaxCoordinator(hass, Mock(), scan_interval=None)
         zones = []
         for zone_id in ("Zone1", "Zone2"):
-            zone = {"id": zone_id, "Name": zone_id}
+            zone = {
+                "id": zone_id,
+                "Name": zone_id,
+                "IsZoneIndependent": True,
+                "ZoneConfiguration": "Bridged2p1",
+            }
             for description in descriptions:
                 target = zone
                 for key in description.path[:-1]:
@@ -66,7 +70,7 @@ async def test_zone_controls_register(tmp_path, caplog, module, descriptions):
         coordinator.async_set_updated_data(
             {"device_info": {"SerialNumber": "test-nax"}, "output_channels": zones}
         )
-        entry = SimpleNamespace(entry_id="test-entry")
+        entry = SimpleNamespace(entry_id="test-entry", async_on_unload=Mock())
         hass.data[DOMAIN] = {entry.entry_id: coordinator}
         entities = []
         await module.async_setup_entry(hass, entry, entities.extend)
@@ -89,7 +93,9 @@ async def test_zone_controls_register(tmp_path, caplog, module, descriptions):
             else:
                 assert registered.disabled_by is er.RegistryEntryDisabler.INTEGRATION
 
-        assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
+        assert not [
+            record for record in caplog.records if record.levelno >= logging.ERROR
+        ]
     finally:
         await platform.async_reset()
         await hass.async_stop()

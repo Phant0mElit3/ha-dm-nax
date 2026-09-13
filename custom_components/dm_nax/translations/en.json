@@ -12,6 +12,25 @@
           "verify_ssl": "Verify SSL certificate",
           "scan_interval": "Polling interval in seconds"
         }
+      },
+      "reauth_confirm": {
+        "title": "Repair DM NAX credentials",
+        "description": "Enter the device web UI credentials.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure DM NAX",
+        "description": "Update the connection to the same device. Leave the password empty to keep the current password.",
+        "data": {
+          "host": "Device host or IP",
+          "username": "Username",
+          "password": "Password",
+          "use_ssl": "Use HTTPS",
+          "verify_ssl": "Verify SSL certificate"
+        }
       }
     },
     "error": {
@@ -19,7 +38,10 @@
       "invalid_auth": "Invalid authentication"
     },
     "abort": {
-      "already_configured": "Device is already configured"
+      "already_configured": "Device is already configured",
+      "unique_id_mismatch": "The connected device is not the device configured in this entry.",
+      "reauth_successful": "Authentication updated successfully.",
+      "reconfigure_successful": "Connection settings updated successfully."
     }
   },
   "options": {
@@ -32,4 +54,3 @@
     }
   }
 }
-

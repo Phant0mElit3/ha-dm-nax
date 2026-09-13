@@ -2,18 +2,31 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+import re
+from datetime import timedelta
 
 from aiohttp import CookieJar
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME, Platform
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_USERNAME,
+    Platform,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .api import DmNaxApi
-from .const import CONF_USE_SSL, CONF_VERIFY_SSL, DEFAULT_SCAN_INTERVAL, DOMAIN, PLATFORMS
+from .const import (
+    CONF_USE_SSL,
+    CONF_VERIFY_SSL,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    PLATFORMS,
+)
 from .coordinator import DmNaxCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,7 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
     )
     if isinstance(scan_interval, int):
-        scan_interval = timedelta(seconds=scan_interval)
+        scan_interval = timedelta(seconds=max(5, min(300, scan_interval)))
 
     verify_ssl = entry.data.get(CONF_VERIFY_SSL, False)
     session = async_create_clientsession(
@@ -67,14 +80,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api,
         scan_interval=scan_interval,
     )
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception:
+        await api.async_close()
+        raise
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
-    _async_enable_common_zone_controls(hass, entry)
     await hass.config_entries.async_forward_entry_setups(
         entry,
         [Platform(platform) for platform in PLATFORMS],
     )
+    entry.async_on_unload(entry.add_update_listener(_async_reload_options))
     _LOGGER.info("DM NAX integration set up for host %s", entry.data[CONF_HOST])
     return True
 
@@ -99,9 +116,24 @@ def _async_enable_common_zone_controls(hass: HomeAssistant, entry: ConfigEntry) 
             continue
         if registry_entry.disabled_by != er.RegistryEntryDisabler.INTEGRATION:
             continue
-        if not any(
-            registry_entry.unique_id.endswith(f"_{suffix}")
-            for suffix in _COMMON_ZONE_CONTROL_SUFFIXES
-        ):
+        match = re.fullmatch(
+            r"dm_nax_.+_(?:Zone[0-9]+|Ch[0-9]+)_([a-z]+)", registry_entry.unique_id
+        )
+        if not match or match[1] not in _COMMON_ZONE_CONTROL_SUFFIXES:
             continue
         registry.async_update_entity(registry_entry.entity_id, disabled_by=None)
+
+
+async def _async_reload_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Apply polling changes immediately."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Apply the common-control migration once, preserving later user choices."""
+    if entry.version > 1:
+        return False
+    if entry.minor_version < 2:
+        _async_enable_common_zone_controls(hass, entry)
+        hass.config_entries.async_update_entry(entry, minor_version=2)
+    return True

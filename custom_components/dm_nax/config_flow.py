@@ -4,23 +4,34 @@ from __future__ import annotations
 
 from typing import Any
 
-from aiohttp import CookieJar
 import voluptuous as vol
-
+from aiohttp import CookieJar
 from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_USERNAME,
+)
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers import selector
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .api import DmNaxApi, DmNaxApiError, DmNaxAuthError
-from .const import CONF_USE_SSL, CONF_VERIFY_SSL, DEFAULT_NAME, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import (
+    CONF_USE_SSL,
+    CONF_VERIFY_SSL,
+    DEFAULT_NAME,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
 
 
 class DmNaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a DM NAX config flow."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     async def async_step_user(
         self,
@@ -47,31 +58,84 @@ class DmNaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_HOST): str,
                     vol.Required(CONF_USERNAME, default="admin"): str,
                     vol.Required(CONF_PASSWORD): selector.TextSelector(
-                        selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.PASSWORD
+                        )
                     ),
                     vol.Optional(CONF_USE_SSL, default=True): bool,
                     vol.Optional(CONF_VERIFY_SSL, default=False): bool,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
                         default=int(DEFAULT_SCAN_INTERVAL.total_seconds()),
-                    ): int,
+                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_reauth(self, entry_data: dict[str, Any]):
+        """Repair credentials for an existing device."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(self, user_input=None):
+        """Validate replacement credentials before updating the entry."""
+        return await self._async_update_connection("reauth_confirm", user_input)
+
+    async def async_step_reconfigure(self, user_input=None):
+        """Change the host or connection settings without replacing entities."""
+        return await self._async_update_connection("reconfigure", user_input)
+
+    async def _async_update_connection(self, step_id, user_input):
+        entry = (
+            self._get_reauth_entry()
+            if step_id == "reauth_confirm"
+            else self._get_reconfigure_entry()
+        )
+        errors = {}
+        if user_input is not None:
+            data = {**entry.data, **user_input}
+            if not user_input.get(CONF_PASSWORD):
+                data[CONF_PASSWORD] = entry.data[CONF_PASSWORD]
+            try:
+                info = await _async_validate_input(self.hass, data)
+            except DmNaxAuthError:
+                errors["base"] = "invalid_auth"
+            except DmNaxApiError:
+                errors["base"] = "cannot_connect"
+            else:
+                await self.async_set_unique_id(info["unique_id"])
+                self._abort_if_unique_id_mismatch()
+                return self.async_update_reload_and_abort(entry, data=data)
+
+        fields = {}
+        if step_id == "reconfigure":
+            fields[vol.Required(CONF_HOST, default=entry.data[CONF_HOST])] = str
+            fields[
+                vol.Optional(CONF_USE_SSL, default=entry.data.get(CONF_USE_SSL, True))
+            ] = bool
+            fields[
+                vol.Optional(
+                    CONF_VERIFY_SSL, default=entry.data.get(CONF_VERIFY_SSL, False)
+                )
+            ] = bool
+        fields[vol.Required(CONF_USERNAME, default=entry.data[CONF_USERNAME])] = str
+        password_key = vol.Required if step_id == "reauth_confirm" else vol.Optional
+        fields[password_key(CONF_PASSWORD)] = selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+        )
+        return self.async_show_form(
+            step_id=step_id, data_schema=vol.Schema(fields), errors=errors
         )
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry):
         """Return the options flow."""
-        return DmNaxOptionsFlow(config_entry)
+        return DmNaxOptionsFlow()
 
 
 class DmNaxOptionsFlow(config_entries.OptionsFlow):
     """Handle DM NAX options."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
 
     async def async_step_init(
         self,
@@ -92,7 +156,7 @@ class DmNaxOptionsFlow(config_entries.OptionsFlow):
                             CONF_SCAN_INTERVAL,
                             int(DEFAULT_SCAN_INTERVAL.total_seconds()),
                         ),
-                    ): int,
+                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
                 }
             ),
         )
@@ -107,6 +171,7 @@ async def _async_validate_input(
         hass,
         verify_ssl=data.get(CONF_VERIFY_SSL, False),
         cookie_jar=CookieJar(unsafe=True),
+        auto_cleanup=False,
     )
     api = DmNaxApi(
         session,
@@ -117,12 +182,19 @@ async def _async_validate_input(
         verify_ssl=data.get(CONF_VERIFY_SSL, False),
     )
     try:
-        device_info = (await api.async_get("/Device/DeviceInfo")).get("Device", {}).get(
-            "DeviceInfo",
-            {},
+        device_info = (
+            (await api.async_get("/Device/DeviceInfo"))
+            .get("Device", {})
+            .get(
+                "DeviceInfo",
+                {},
+            )
         )
     finally:
         await api.async_close()
+
+    if not isinstance(device_info, dict) or not device_info:
+        raise DmNaxApiError("DM NAX did not return device information")
 
     unique_id = str(
         device_info.get("DeviceId")

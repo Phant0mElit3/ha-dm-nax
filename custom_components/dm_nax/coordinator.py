@@ -7,9 +7,10 @@ import re
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import DmNaxApi
+from .api import DmNaxApi, DmNaxApiError, DmNaxAuthError
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,7 +35,12 @@ class DmNaxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.api = api
 
     async def _async_update_data(self) -> dict[str, Any]:
-        inventory = await self.api.async_get_inventory()
+        try:
+            inventory = await self.api.async_get_inventory()
+        except DmNaxAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except DmNaxApiError as err:
+            raise UpdateFailed(str(err)) from err
         device = _device_object(inventory)
         device_info = _object_at(device, "DeviceInfo")
         input_channels = _input_items(device)
@@ -141,7 +147,9 @@ def _route_items(routes: dict[str, Any]) -> list[dict[str, Any]]:
         item = dict(value)
         item.setdefault("id", item.get("Id", key))
         item.setdefault("key", key)
-        item["number"] = _numeric_suffix(key) or _numeric_suffix(str(item.get("id", "")))
+        item["number"] = _numeric_suffix(key) or _numeric_suffix(
+            str(item.get("id", ""))
+        )
         items.append(item)
     return items
 

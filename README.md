@@ -49,6 +49,12 @@ You will need:
 Most DM NAX devices use a self-signed certificate, so SSL verification is
 usually left disabled.
 
+Polling intervals are limited to 5-300 seconds. Changes in **Options** reload
+the integration automatically. Use **Reconfigure** to change the host or
+connection settings; the replacement connection must identify the same device.
+Expired credentials can be repaired through Home Assistant's reauthentication
+flow without deleting the integration or its entities.
+
 ## Current Coverage
 
 - Device metadata from `/Device/DeviceInfo`
@@ -113,19 +119,54 @@ IDs stay unchanged, so dashboards and automations keep their references. Names
 you have explicitly overridden in HA stay overridden. AirPlay/Spotify casting
 names are separate device settings and are not changed by this action.
 
-Fully restart Home Assistant after installing v0.2.6 to load the text platform.
+Fully restart Home Assistant after installing an integration update.
 
 ## Known Notes
 
 - The integration targets current DM NAX firmware objects: `ZoneOutputs`,
   `InputSources`, and `AvMatrixRouting`.
-- Older object names such as `InputChannels` and `OutputChannels` are kept as
-  fallbacks where possible.
+- Alternate `InputChannels` and `OutputChannels` devices use their own write
+  schema, including `AmpOutput`. Their read-only mute level is not offered as a
+  writable control. This path has automated tests but still needs live model
+  verification; it is not simply an older name for the zone-based API.
 - Common zone tuning entities are enabled by default; advanced entities are
   disabled by default because they are configuration-style controls rather than
   everyday dashboard controls.
 - Speaker, zone configuration, provider, and PEQ entities are disabled by
   default because they can materially change how a zone behaves.
+- Controls follow current capabilities. Unsupported controls become unavailable
+  and newly supported controls are discovered on refresh. Crossover requires an
+  independent zone in a supported 2.1 bridge mode.
+- Speaker power uses the device's reported maximum, including 300/500 W where
+  supported. Reported basic audio ranges are used when provided.
+- Duplicate source names include an input identifier so each source remains
+  selectable. Source selection is offered only when the device reports a route.
+- Accepted volume changes are displayed for at most two seconds while settling;
+  new device volume feedback takes precedence. Device minimum/maximum limits
+  are respected. A dashboard slider's drag/release behavior is still controlled
+  by the dashboard card, not by the integration.
+- Crestron restart-required responses are reported explicitly; the integration
+  does not reboot the device automatically.
+- The visibility migration runs once and no longer enables individual PEQ bypass
+  controls. Previously enabled entities are preserved, including those enabled
+  by the older bug; disable unwanted PEQ entities manually in HA.
+- Bundled original brand icons display on Home Assistant 2026.3 and newer.
+  See [HA brand-image documentation](https://developers.home-assistant.io/docs/core/integration/brand_images/).
+- This maintenance release does not add fault/signal sensor entities, input
+  controls, push updates, chime playback, or unverified advanced ducking controls.
+
+## Testing
+
+The regression suite runs against Home Assistant 2026.9.2 and Python 3.14:
+
+```sh
+python -m pip install -r requirements-test.txt
+python -m pytest -q
+```
+
+Tests exercise real HA entity registration as well as simulated API responses,
+configuration flows, capability changes, routing, and volume reconciliation.
+They do not make changes to a physical NAX.
 
 ## Crestron API
 
