@@ -9,6 +9,7 @@ from aiohttp import CookieJar
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .api import DmNaxApi
@@ -16,6 +17,26 @@ from .const import CONF_USE_SSL, CONF_VERIFY_SSL, DEFAULT_SCAN_INTERVAL, DOMAIN,
 from .coordinator import DmNaxCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+_COMMON_ZONE_CONTROL_SUFFIXES = frozenset(
+    {
+        "lineoutvolume",
+        "bass",
+        "treble",
+        "balance",
+        "delayinms",
+        "substrimlevel",
+        "isloudnessenabled",
+        "isdndenabled",
+        "iseqbypassenabled",
+        "islineouteqbypassenabled",
+        "isduckingenabled",
+        "isstereoenabled",
+        "iscssenabled",
+        "toneprofile",
+        "nightmode",
+    }
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -49,6 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    _async_enable_common_zone_controls(hass, entry)
     await hass.config_entries.async_forward_entry_setups(
         entry,
         [Platform(platform) for platform in PLATFORMS],
@@ -68,3 +90,18 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.api.async_close()
     return unload_ok
 
+
+def _async_enable_common_zone_controls(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Enable common zone controls that older versions registered as disabled."""
+    registry = er.async_get(hass)
+    for registry_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if registry_entry.domain not in {"number", "select", "switch"}:
+            continue
+        if registry_entry.disabled_by != er.RegistryEntryDisabler.INTEGRATION:
+            continue
+        if not any(
+            registry_entry.unique_id.endswith(f"_{suffix}")
+            for suffix in _COMMON_ZONE_CONTROL_SUFFIXES
+        ):
+            continue
+        registry.async_update_entity(registry_entry.entity_id, disabled_by=None)

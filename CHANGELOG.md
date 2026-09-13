@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- Automatically re-enables common zone controls that were registered as
+  disabled by version 0.2.0, so existing installs see the new controls after
+  updating and restarting Home Assistant.
+
 ## 0.2.1
 
 - Enables common zone controls by default so they are visible after install:
