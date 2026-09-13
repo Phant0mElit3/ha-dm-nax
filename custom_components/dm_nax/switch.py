@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -21,14 +21,11 @@ from .entity import DmNaxEntity
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class DmNaxZoneSwitchDescription:
+@dataclass(frozen=True, kw_only=True)
+class DmNaxZoneSwitchDescription(SwitchEntityDescription):
     """Description of a writable DM NAX zone switch."""
 
-    key: str
-    name: str
     path: tuple[str, ...]
-    icon: str
     scope: str = "audio"
     support_path: tuple[str, ...] | None = None
     enabled_default: bool = False

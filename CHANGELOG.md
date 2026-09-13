@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.5
+
+- Fixes zone number, switch, and select entities failing to register with
+  `AttributeError: ... entity_registry_visible_default` by inheriting Home
+  Assistant's platform entity descriptions.
+- Preserves existing entity IDs, common-control visibility, and disabled defaults
+  for advanced controls.
+- Adds regression tests using Home Assistant 2026.9.2 entity registration and
+  state writing, run automatically on pushes and pull requests.
+- After updating in HACS, fully restart Home Assistant to load the corrected code.
+
 ## 0.2.4
 
 - Adds setup logging for zone number, switch, and select entity creation counts.

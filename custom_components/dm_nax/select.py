@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from homeassistant.components.select import SelectEntity
+from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -21,15 +21,12 @@ from .entity import DmNaxEntity
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class DmNaxZoneSelectDescription:
+@dataclass(frozen=True, kw_only=True)
+class DmNaxZoneSelectDescription(SelectEntityDescription):
     """Description of a writable DM NAX zone select."""
 
-    key: str
-    name: str
     path: tuple[str, ...]
     options: tuple[str, ...]
-    icon: str
     scope: str = "audio"
     options_path: tuple[str, ...] | None = None
     support_path: tuple[str, ...] | None = None

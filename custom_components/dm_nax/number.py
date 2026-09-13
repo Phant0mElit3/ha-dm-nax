@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from homeassistant.components.number import NumberEntity, NumberMode
+from homeassistant.components.number import NumberEntity, NumberEntityDescription, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -21,18 +21,11 @@ from .entity import DmNaxEntity
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class DmNaxZoneNumberDescription:
+@dataclass(frozen=True, kw_only=True)
+class DmNaxZoneNumberDescription(NumberEntityDescription):
     """Description of a writable DM NAX zone number."""
 
-    key: str
-    name: str
     path: tuple[str, ...]
-    native_min_value: float
-    native_max_value: float
-    native_step: float
-    native_unit_of_measurement: str | None
-    icon: str
     native_scale: float
     scope: str = "audio"
     max_value_path: tuple[str, ...] | None = None
