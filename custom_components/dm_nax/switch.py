@@ -29,6 +29,7 @@ class DmNaxZoneSwitchDescription:
     scope: str = "audio"
     support_path: tuple[str, ...] | None = None
     enabled_default: bool = False
+    entity_category: EntityCategory | None = EntityCategory.CONFIG
 
 
 DIRECT_SWITCH_DESCRIPTIONS = (
@@ -38,6 +39,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         path=("IsLoudnessEnabled",),
         icon="mdi:volume-high",
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSwitchDescription(
         key="IsDndEnabled",
@@ -45,6 +47,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         path=("IsDndEnabled",),
         icon="mdi:minus-circle-outline",
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSwitchDescription(
         key="IsEqBypassEnabled",
@@ -52,6 +55,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         path=("IsEqBypassEnabled",),
         icon="mdi:equalizer-outline",
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSwitchDescription(
         key="IsLineOutEqBypassEnabled",
@@ -60,6 +64,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         icon="mdi:audio-input-rca",
         support_path=("IsLineOutSupported",),
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSwitchDescription(
         key="IsDuckingEnabled",
@@ -67,6 +72,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         path=("IsDuckingEnabled",),
         icon="mdi:volume-vibrate",
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSwitchDescription(
         key="IsStereoEnabled",
@@ -75,6 +81,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         icon="mdi:speaker-multiple",
         support_path=("IsStereoSelectionSupported",),
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSwitchDescription(
         key="IsTestToneActive",
@@ -88,6 +95,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         path=("IsCssEnabled",),
         icon="mdi:surround-sound",
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSwitchDescription(
         key="IsIdentifyActiveLeft",
@@ -168,8 +176,6 @@ async def async_setup_entry(
 class DmNaxZoneSwitch(DmNaxEntity, SwitchEntity):
     """A writable DM NAX zone switch."""
 
-    _attr_entity_category = EntityCategory.CONFIG
-
     def __init__(
         self,
         coordinator: DmNaxCoordinator,
@@ -183,6 +189,7 @@ class DmNaxZoneSwitch(DmNaxEntity, SwitchEntity):
         )
         self._attr_icon = description.icon
         self._attr_entity_registry_enabled_default = description.enabled_default
+        self._attr_entity_category = description.entity_category
 
     @property
     def name(self) -> str | None:

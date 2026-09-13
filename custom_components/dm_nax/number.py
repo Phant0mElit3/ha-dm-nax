@@ -35,6 +35,7 @@ class DmNaxZoneNumberDescription:
     max_value_path: tuple[str, ...] | None = None
     support_path: tuple[str, ...] | None = None
     enabled_default: bool = False
+    entity_category: EntityCategory | None = EntityCategory.CONFIG
 
 
 DIRECT_NUMBER_DESCRIPTIONS = (
@@ -94,6 +95,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         native_scale=0.1,
         support_path=("IsLineOutSupported",),
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneNumberDescription(
         key="Bass",
@@ -106,6 +108,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         icon="mdi:equalizer",
         native_scale=0.1,
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneNumberDescription(
         key="Treble",
@@ -118,6 +121,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         icon="mdi:equalizer",
         native_scale=0.1,
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneNumberDescription(
         key="Balance",
@@ -131,6 +135,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         native_scale=0.1,
         support_path=("IsBalanceSupported",),
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneNumberDescription(
         key="DelayInms",
@@ -143,6 +148,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         icon="mdi:timer-outline",
         native_scale=1,
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneNumberDescription(
         key="DuckedVolume",
@@ -233,6 +239,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         native_scale=0.1,
         support_path=("IsSubTrimLevelSupported",),
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneNumberDescription(
         key="SpeakerPower",
@@ -368,7 +375,6 @@ async def async_setup_entry(
 class DmNaxZoneNumber(DmNaxEntity, NumberEntity):
     """A writable DM NAX zone number."""
 
-    _attr_entity_category = EntityCategory.CONFIG
     _attr_mode = NumberMode.BOX
 
     def __init__(
@@ -384,6 +390,7 @@ class DmNaxZoneNumber(DmNaxEntity, NumberEntity):
         )
         self._attr_icon = description.icon
         self._attr_entity_registry_enabled_default = description.enabled_default
+        self._attr_entity_category = description.entity_category
         self._attr_native_min_value = description.native_min_value
         self._attr_native_step = description.native_step
         self._attr_native_unit_of_measurement = description.native_unit_of_measurement

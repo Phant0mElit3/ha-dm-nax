@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+- Moves common zone controls out of Home Assistant's configuration entity
+  category so they appear with normal device controls.
+- Keeps advanced tuning and calibration controls as disabled configuration
+  entities.
+
 ## 0.2.2
 
 - Automatically re-enables common zone controls that were registered as

@@ -31,6 +31,7 @@ class DmNaxZoneSelectDescription:
     options_path: tuple[str, ...] | None = None
     support_path: tuple[str, ...] | None = None
     enabled_default: bool = False
+    entity_category: EntityCategory | None = EntityCategory.CONFIG
 
 
 DIRECT_SELECT_DESCRIPTIONS = (
@@ -41,6 +42,7 @@ DIRECT_SELECT_DESCRIPTIONS = (
         options=("Off", "Classical", "Jazz", "Pop", "Rock", "SpokenWord"),
         icon="mdi:music-clef-treble",
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSelectDescription(
         key="NightMode",
@@ -49,6 +51,7 @@ DIRECT_SELECT_DESCRIPTIONS = (
         options=("Off", "Low", "Medium", "High"),
         icon="mdi:weather-night",
         enabled_default=True,
+        entity_category=None,
     ),
     DmNaxZoneSelectDescription(
         key="SpeakerImpedance",
@@ -107,8 +110,6 @@ async def async_setup_entry(
 class DmNaxZoneSelect(DmNaxEntity, SelectEntity):
     """A writable DM NAX zone select."""
 
-    _attr_entity_category = EntityCategory.CONFIG
-
     def __init__(
         self,
         coordinator: DmNaxCoordinator,
@@ -122,6 +123,7 @@ class DmNaxZoneSelect(DmNaxEntity, SelectEntity):
         )
         self._attr_icon = description.icon
         self._attr_entity_registry_enabled_default = description.enabled_default
+        self._attr_entity_category = description.entity_category
 
     @property
     def name(self) -> str | None:
