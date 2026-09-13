@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+- Adds disabled-by-default optional zone controls for deeper DM NAX settings:
+  announcement/intercom levels, ducked/mute volume, ramp times, test tone,
+  crossover, sub trim, speaker output/protect/power, AirPlay and Spotify zone
+  provider toggles, night mode, tone profile, speaker impedance, zone
+  configuration, and PEQ band controls.
+- Adds nested ZoneOutputs partial POST support for ZoneAudio and zone-level
+  settings.
+
 ## 0.1.0
 
 - Initial HACS-ready custom repository package.
@@ -12,4 +22,3 @@
 - Adds optional disabled-by-default zone number and switch controls for common
   ZoneAudio settings.
 - Validated live against a DM-NAX-8ZSA.
-

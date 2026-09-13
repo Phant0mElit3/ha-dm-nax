@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import logging
 from typing import Any
 
@@ -133,11 +133,24 @@ class DmNaxApi:
     async def async_set_zone_audio_value(
         self,
         zone_id: str,
-        key: str,
+        key: str | Sequence[str],
         value: Any,
     ) -> dict[str, Any]:
-        """Set one direct ZoneAudio property."""
-        return await self.async_post_device(_zone_audio_payload(zone_id, {key: value}))
+        """Set one ZoneAudio property, including nested properties."""
+        path = (key,) if isinstance(key, str) else tuple(key)
+        return await self.async_post_device(
+            _zone_audio_payload(zone_id, _nested_payload(path, value))
+        )
+
+    async def async_set_zone_value(
+        self,
+        zone_id: str,
+        key: str | Sequence[str],
+        value: Any,
+    ) -> dict[str, Any]:
+        """Set one zone property, including nested properties outside ZoneAudio."""
+        path = (key,) if isinstance(key, str) else tuple(key)
+        return await self.async_post_device(_zone_payload(zone_id, _nested_payload(path, value)))
 
     async def async_set_audio_source(
         self,
@@ -258,6 +271,33 @@ def _zone_audio_payload(zone_id: str, values: Mapping[str, Any]) -> dict[str, An
             }
         }
     }
+
+
+def _zone_payload(zone_id: str, values: Mapping[str, Any]) -> dict[str, Any]:
+    """Build a narrow partial object for a zone update."""
+    return {
+        "Device": {
+            "ZoneOutputs": {
+                "Zones": {
+                    zone_id: dict(values),
+                }
+            }
+        }
+    }
+
+
+def _nested_payload(path: Sequence[str], value: Any) -> dict[str, Any]:
+    """Build a nested payload dictionary from a property path."""
+    if not path:
+        raise ValueError("path must contain at least one key")
+    payload: dict[str, Any] = {}
+    current = payload
+    for key in path[:-1]:
+        child: dict[str, Any] = {}
+        current[key] = child
+        current = child
+    current[path[-1]] = value
+    return payload
 
 
 async def _response_error(response: ClientResponse) -> DmNaxApiError:

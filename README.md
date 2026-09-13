@@ -73,6 +73,16 @@ usually left disabled.
   - EQ bypass
   - Line out EQ bypass
   - Ducking
+  - Ducking and mute volume levels
+  - Volume ramp up/down times
+  - Test tone and test tone volume
+  - Crossover frequency and sub trim
+  - Speaker output, speaker protect, speaker power, and impedance
+  - Announcement and intercom volume/ducking/ramp controls
+  - AirPlay and Spotify Connect zone provider toggles
+  - Night mode and tone profile
+  - Zone configuration
+  - PEQ band frequency, gain, bandwidth, type, and bypass
 
 ## Known Notes
 
@@ -82,8 +92,8 @@ usually left disabled.
   fallbacks where possible.
 - Optional zone tuning entities are disabled by default because they are
   configuration-style controls rather than everyday dashboard controls.
-- PEQ bands and speaker/amp configuration are not exposed yet. They are
-  intentionally left out until more live testing confirms safe behavior.
+- Speaker, zone configuration, provider, and PEQ entities are disabled by
+  default because they can materially change how a zone behaves.
 
 ## Crestron API
 
