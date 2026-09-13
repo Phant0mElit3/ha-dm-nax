@@ -12,4 +12,4 @@ CONF_VERIFY_SSL = "verify_ssl"
 DEFAULT_NAME = "DM NAX"
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=10)
 
-PLATFORMS = ["media_player", "number", "select", "switch"]
+PLATFORMS = ["media_player", "number", "select", "switch", "text"]

@@ -327,7 +327,7 @@ def _raise_for_action_results(payload: dict[str, Any]) -> None:
             if not isinstance(result, dict):
                 continue
             status_id = result.get("StatusId")
-            if isinstance(status_id, int) and status_id < 0:
+            if isinstance(status_id, int) and (status_id < 0 or status_id == 3):
                 path = result.get("Path", "unknown path")
                 status = result.get("StatusInfo", "unknown error")
                 failures.append(f"{path}: {status}")

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.6
+
+- Adds enabled configuration text entities such as `Zone2 Name` for renaming
+  physical NAX zones from Home Assistant or `text.set_value` automations.
+- Writes only the zone's `Name` property and refreshes device state. Existing
+  entity IDs stay unchanged; device-provided display names follow the next poll.
+- Validates names as 1-50 characters, with no leading dash, blank-only name, or
+  line breaks. Casting names and HA user-assigned display names are separate.
+- Treats Crestron's unsupported-property status as a command error.
+- Adds registration, identity, payload, validation, rejection and timeout tests.
+- Fully restart Home Assistant after updating to load the new text platform.
+
 ## 0.2.5
 
 - Fixes zone number, switch, and select entities failing to register with

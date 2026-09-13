@@ -14,6 +14,8 @@ Custom Home Assistant integration for Crestron DM NAX devices using the document
   - `/Device/AudioRanges`
 - Creates one `media_player` entity per output channel.
 - Supports volume, mute, and source selection through narrow partial CresNext POST payloads.
+- Adds enabled configuration text entities such as `Zone2 Name` for device-side
+  zone renaming using `text.set_value`; existing entity IDs remain stable.
 - Adds common zone controls for bass, treble, balance, delay, loudness, DND,
   EQ bypass, stereo, tone profile, and night mode, with deeper calibration
   controls available as disabled entities.

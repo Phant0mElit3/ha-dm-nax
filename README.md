@@ -57,6 +57,7 @@ usually left disabled.
 - Audio ranges from `/Device/AudioRanges`
 - Source routing from `/Device/AvMatrixRouting`
 - Zone media players with volume, mute, source list, and source select
+- Zone name text entities, enabled under the device's configuration controls
 - Optimistic Home Assistant volume state after accepted volume commands
 - Common zone configuration entities enabled by default:
   - Bass
@@ -88,6 +89,31 @@ usually left disabled.
   - AirPlay and Spotify Connect zone provider toggles
   - Zone configuration
   - PEQ band frequency, gain, bandwidth, type, and bypass
+
+## Renaming Zones
+
+Open the DM NAX device in **Settings > Devices & services** and edit the
+configuration text entity for the physical zone, for example **Zone2 Name**.
+This changes the name stored on the NAX. Names must be 1-50 characters, cannot
+start with a dash, and cannot be blank or contain line breaks.
+
+Automations can use the standard `text.set_value` action. Replace the example
+entity ID below with the Zone2 Name text entity from your installation:
+
+```yaml
+action: text.set_value
+target:
+  entity_id: text.crestron_dm_nax_zone2_name
+data:
+  value: Kitchen
+```
+
+The zone's device-provided display names update after polling. Existing entity
+IDs stay unchanged, so dashboards and automations keep their references. Names
+you have explicitly overridden in HA stay overridden. AirPlay/Spotify casting
+names are separate device settings and are not changed by this action.
+
+Fully restart Home Assistant after installing v0.2.6 to load the text platform.
 
 ## Known Notes
 
