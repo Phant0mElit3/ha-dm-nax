@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0
+
+- Adds a separate enabled AES67 Stream select for each independent output
+  exposing a valid `NaxRxStream` reference. Uses the device's actual receiver
+  mapping, not a guessed zone-to-stream number.
+- Discovers network audio streams through `NaxAudio.NaxSdp`, using session
+  names with duplicate-name disambiguation and multicast/port validation.
+- Configures only the selected receive stream and verifies its reported
+  address, port and started status. Serializes commands per receiver and
+  bounds each running selection to 15 seconds.
+- Adds receiver-only Off and receive-status feedback. Refreshes after partial
+  failures rather than optimistically claiming the requested stream is active.
+- Preserves volume, mute, matrix source selection, other receivers, transmitter
+  settings and encryption settings. Select AES67 as the zone's main source
+  separately to hear its network stream.
+- Adds regression coverage for real HA select registration, discovery,
+  mapping, failures, scope and receive readback. Live end-to-end audio testing
+  of the new controls is still required after installation.
+
 ## 0.2.7
 
 - Fixes the current-HA Options crash, validates 5-300 second polling intervals,

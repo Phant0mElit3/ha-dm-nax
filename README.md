@@ -63,6 +63,7 @@ flow without deleting the integration or its entities.
 - Audio ranges from `/Device/AudioRanges`
 - Source routing from `/Device/AvMatrixRouting`
 - Zone media players with volume, mute, source list, and source select
+- Separate AES67 Stream selectors for independent zones with reported receive mappings
 - Zone name text entities, enabled under the device's configuration controls
 - Optimistic Home Assistant volume state after accepted volume commands
 - Common zone configuration entities enabled by default:
@@ -95,6 +96,43 @@ flow without deleting the integration or its entities.
   - AirPlay and Spotify Connect zone provider toggles
   - Zone configuration
   - PEQ band frequency, gain, bandwidth, type, and bypass
+
+## Selecting AES67 Streams
+
+The media player's **AES67** source chooses the network-audio input; it does
+not identify which stream to receive. Version 0.3.0 adds an **AES67 Stream**
+select for each supported zone, such as **Living Room AES67 Stream**.
+
+1. Choose the encoder's advertised audio session in the zone's **AES67 Stream** select.
+2. Select **AES67** in that zone media player's source list to hear it.
+
+These controls are separate deliberately: preparing an AES67 subscription does
+not change a zone playing music from another input. Volume and mute remain
+unchanged. **Off** in the stream selector disables/stops only that zone's AES67
+receiver, not the zone's other inputs.
+
+The integration uses the device's `NaxRxStream` reference and discovers audio
+sessions from `NaxAudio.NaxSdp.NaxSdpStreams`. It does not derive audio addresses
+from NVX video multicast addresses. Streams must advertise a valid multicast
+address, UDP port and a receiver-compatible session name (1-31 characters).
+The NVX encoder's AES67 transmission and network discovery must already be
+configured. Encryption and transmitter settings are not changed automatically.
+
+Readback checks the receiver's reported address, port and started status, not
+merely its requested fields. Pending or undiscovered receive sessions show
+unknown; command failures are reported to HA. Receiver status is available in
+the selector's attributes. This is not a guarantee of audible sound: the zone
+must also select AES67 and be unmuted, with compatible source audio/network
+configuration.
+
+Only outputs with an explicit receiver mapping are supported initially.
+Existing entity IDs and source options remain unchanged. Update and fully
+restart Home Assistant; removing/re-adding the integration is unnecessary.
+The new controls are regression-tested; live end-to-end audio validation after
+installation remains necessary. No NVX-to-NAX follow automation is enabled.
+
+References: [NaxAudio API](https://sdkcon78221.crestron.com/sdk/DM_NAX_REST_API/Content/Topics/Objects/NaxAudio.htm)
+and [ZoneOutputs mapping](https://sdkcon78221.crestron.com/sdk/DM_NAX_REST_API/Content/Topics/Objects-NAX/ZoneOutputs.htm).
 
 ## Renaming Zones
 

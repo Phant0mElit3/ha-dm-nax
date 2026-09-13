@@ -9,6 +9,8 @@ from typing import Any
 
 from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
 
+from .aes67 import stream_endpoint, stream_name, stream_started, stream_stopped
+
 _LOGGER = logging.getLogger(__name__)
 
 READ_ENDPOINTS = {
@@ -19,6 +21,7 @@ READ_ENDPOINTS = {
     "output_channels": "/Device/OutputChannels",
     "av_matrix_routing": "/Device/AvMatrixRouting",
     "audio_ranges": "/Device/AudioRanges",
+    "nax_audio": "/Device/NaxAudio",
 }
 
 
@@ -59,6 +62,7 @@ class DmNaxApi:
         self._owns_session = owns_session
         self._request_lock = asyncio.Lock()
         self._timeout = ClientTimeout(total=10, connect=5)
+        self._rx_locks: dict[str, asyncio.Lock] = {}
 
     @property
     def base_url(self) -> str:
@@ -132,7 +136,7 @@ class DmNaxApi:
             inventory[primary] = payload
             if not payload.get("Device", {}).get(object_name, {}).get(child):
                 inventory[alternate] = await self._async_optional_object(alternate)
-        for key in ("av_matrix_routing", "audio_ranges"):
+        for key in ("av_matrix_routing", "audio_ranges", "nax_audio"):
             inventory[key] = await self._async_optional_object(key)
         return inventory
 
@@ -216,6 +220,73 @@ class DmNaxApi:
                 }
             }
         )
+
+    async def async_select_aes67_stream(
+        self, receiver_id: str, stream: dict[str, Any] | None
+    ) -> None:
+        """Set one receive subscription without changing zone routing, mute or volume."""
+        if not receiver_id or not receiver_id.isalnum():
+            raise DmNaxApiError("Invalid AES67 receiver reference")
+        endpoint = stream_endpoint(stream) if stream is not None else None
+        if stream is not None and endpoint is None:
+            raise DmNaxApiError(
+                "The AES67 stream has no valid multicast address and port"
+            )
+        values: dict[str, Any] = {"StopRequested": True, "IsDisabled": True}
+        if stream is not None:
+            name = stream_name(stream)
+            if name is None:
+                raise DmNaxApiError(
+                    "The discovered AES67 session name is not supported"
+                )
+            values = {
+                "SessionNameRequested": name,
+                "NetworkAddressRequested": endpoint[0],
+                "PortRequested": endpoint[1],
+                "IsDisabled": False,
+                "StartRequested": True,
+            }
+        lock = self._rx_locks.setdefault(receiver_id, asyncio.Lock())
+        async with lock:
+            try:
+                async with asyncio.timeout(15):
+                    await self.async_post_device(
+                        {
+                            "Device": {
+                                "NaxAudio": {
+                                    "NaxRx": {"NaxRxStreams": {receiver_id: values}}
+                                }
+                            }
+                        }
+                    )
+                    for _ in range(20):
+                        data = await self.async_get(
+                            f"/Device/NaxAudio/NaxRx/NaxRxStreams/{receiver_id}"
+                        )
+                        try:
+                            received = data["Device"]["NaxAudio"]["NaxRx"][
+                                "NaxRxStreams"
+                            ][receiver_id]
+                        except (KeyError, TypeError) as err:
+                            raise DmNaxApiError(
+                                "Missing AES67 receive readback"
+                            ) from err
+                        if not isinstance(received, dict):
+                            raise DmNaxApiError("Invalid AES67 receive readback")
+                        if stream is None and stream_stopped(received):
+                            return
+                        if (
+                            stream is not None
+                            and stream_started(received)
+                            and stream_endpoint(received) == endpoint
+                        ):
+                            return
+                        await asyncio.sleep(0.25)
+                    raise DmNaxApiError(
+                        "The NAX did not confirm the requested AES67 stream state"
+                    )
+            except TimeoutError as err:
+                raise DmNaxApiError("Timed out waiting for AES67 reception") from err
 
     async def async_set_channel_value(
         self, channel_id: str, path: Sequence[str], value: Any

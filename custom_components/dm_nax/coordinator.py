@@ -63,6 +63,10 @@ class DmNaxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "output_channels": outputs,
             "routes": routes,
             "audio_ranges": _object_at(device, "AudioRanges"),
+            "nax_rx_streams": _object_at(device, "NaxAudio", "NaxRx", "NaxRxStreams"),
+            "nax_sdp_streams": _object_at(
+                device, "NaxAudio", "NaxSdp", "NaxSdpStreams"
+            ),
         }
         _LOGGER.debug(
             "DM NAX refreshed: model=%s, inputs=%s, outputs=%s, routes=%s",
