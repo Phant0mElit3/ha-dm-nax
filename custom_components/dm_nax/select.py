@@ -30,6 +30,7 @@ class DmNaxZoneSelectDescription:
     scope: str = "audio"
     options_path: tuple[str, ...] | None = None
     support_path: tuple[str, ...] | None = None
+    enabled_default: bool = False
 
 
 DIRECT_SELECT_DESCRIPTIONS = (
@@ -39,6 +40,7 @@ DIRECT_SELECT_DESCRIPTIONS = (
         path=("ToneProfile",),
         options=("Off", "Classical", "Jazz", "Pop", "Rock", "SpokenWord"),
         icon="mdi:music-clef-treble",
+        enabled_default=True,
     ),
     DmNaxZoneSelectDescription(
         key="NightMode",
@@ -46,6 +48,7 @@ DIRECT_SELECT_DESCRIPTIONS = (
         path=("NightMode",),
         options=("Off", "Low", "Medium", "High"),
         icon="mdi:weather-night",
+        enabled_default=True,
     ),
     DmNaxZoneSelectDescription(
         key="SpeakerImpedance",
@@ -102,10 +105,9 @@ async def async_setup_entry(
 
 
 class DmNaxZoneSelect(DmNaxEntity, SelectEntity):
-    """A disabled-by-default writable DM NAX zone select."""
+    """A writable DM NAX zone select."""
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
@@ -119,6 +121,7 @@ class DmNaxZoneSelect(DmNaxEntity, SelectEntity):
             f"{DOMAIN}_{self._device_id}_{self._id}_{_slug(description.path)}"
         )
         self._attr_icon = description.icon
+        self._attr_entity_registry_enabled_default = description.enabled_default
 
     @property
     def name(self) -> str | None:
@@ -191,4 +194,3 @@ def _value_at(item: dict[str, Any], path: tuple[str, ...]) -> Any:
 def _slug(path: tuple[str, ...]) -> str:
     """Return a stable unique-id suffix from a property path."""
     return "_".join(part.lower() for part in path)
-

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1
+
+- Enables common zone controls by default so they are visible after install:
+  bass, treble, balance, delay, sub trim, line out volume, loudness, Do Not
+  Disturb, EQ bypass, line out EQ bypass, ducking, stereo, CSS, tone profile,
+  and night mode.
+- Keeps deeper calibration, announcement/intercom, speaker configuration,
+  provider, test tone, identify, and PEQ entities disabled by default.
+
 ## 0.2.0
 
 - Adds disabled-by-default optional zone controls for deeper DM NAX settings:

@@ -58,29 +58,34 @@ usually left disabled.
 - Source routing from `/Device/AvMatrixRouting`
 - Zone media players with volume, mute, source list, and source select
 - Optimistic Home Assistant volume state after accepted volume commands
-- Optional disabled-by-default zone configuration entities:
+- Common zone configuration entities enabled by default:
   - Bass
   - Treble
   - Balance
   - Delay
-  - Default volume
-  - Minimum volume
-  - Maximum volume
-  - Maximum casting volume
+  - Sub trim
   - Line out volume
   - Loudness
   - Do Not Disturb
   - EQ bypass
   - Line out EQ bypass
   - Ducking
+  - Stereo
+  - CSS
+  - Night mode
+  - Tone profile
+- Advanced zone configuration entities disabled by default:
+  - Default volume
+  - Minimum volume
+  - Maximum volume
+  - Maximum casting volume
   - Ducking and mute volume levels
   - Volume ramp up/down times
   - Test tone and test tone volume
-  - Crossover frequency and sub trim
+  - Crossover frequency
   - Speaker output, speaker protect, speaker power, and impedance
   - Announcement and intercom volume/ducking/ramp controls
   - AirPlay and Spotify Connect zone provider toggles
-  - Night mode and tone profile
   - Zone configuration
   - PEQ band frequency, gain, bandwidth, type, and bypass
 
@@ -90,8 +95,9 @@ usually left disabled.
   `InputSources`, and `AvMatrixRouting`.
 - Older object names such as `InputChannels` and `OutputChannels` are kept as
   fallbacks where possible.
-- Optional zone tuning entities are disabled by default because they are
-  configuration-style controls rather than everyday dashboard controls.
+- Common zone tuning entities are enabled by default; advanced entities are
+  disabled by default because they are configuration-style controls rather than
+  everyday dashboard controls.
 - Speaker, zone configuration, provider, and PEQ entities are disabled by
   default because they can materially change how a zone behaves.
 

@@ -28,6 +28,7 @@ class DmNaxZoneSwitchDescription:
     icon: str
     scope: str = "audio"
     support_path: tuple[str, ...] | None = None
+    enabled_default: bool = False
 
 
 DIRECT_SWITCH_DESCRIPTIONS = (
@@ -36,18 +37,21 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         name="Loudness",
         path=("IsLoudnessEnabled",),
         icon="mdi:volume-high",
+        enabled_default=True,
     ),
     DmNaxZoneSwitchDescription(
         key="IsDndEnabled",
         name="Do Not Disturb",
         path=("IsDndEnabled",),
         icon="mdi:minus-circle-outline",
+        enabled_default=True,
     ),
     DmNaxZoneSwitchDescription(
         key="IsEqBypassEnabled",
         name="EQ Bypass",
         path=("IsEqBypassEnabled",),
         icon="mdi:equalizer-outline",
+        enabled_default=True,
     ),
     DmNaxZoneSwitchDescription(
         key="IsLineOutEqBypassEnabled",
@@ -55,12 +59,14 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         path=("IsLineOutEqBypassEnabled",),
         icon="mdi:audio-input-rca",
         support_path=("IsLineOutSupported",),
+        enabled_default=True,
     ),
     DmNaxZoneSwitchDescription(
         key="IsDuckingEnabled",
         name="Ducking",
         path=("IsDuckingEnabled",),
         icon="mdi:volume-vibrate",
+        enabled_default=True,
     ),
     DmNaxZoneSwitchDescription(
         key="IsStereoEnabled",
@@ -68,6 +74,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         path=("IsStereoEnabled",),
         icon="mdi:speaker-multiple",
         support_path=("IsStereoSelectionSupported",),
+        enabled_default=True,
     ),
     DmNaxZoneSwitchDescription(
         key="IsTestToneActive",
@@ -80,6 +87,7 @@ DIRECT_SWITCH_DESCRIPTIONS = (
         name="CSS",
         path=("IsCssEnabled",),
         icon="mdi:surround-sound",
+        enabled_default=True,
     ),
     DmNaxZoneSwitchDescription(
         key="IsIdentifyActiveLeft",
@@ -158,10 +166,9 @@ async def async_setup_entry(
 
 
 class DmNaxZoneSwitch(DmNaxEntity, SwitchEntity):
-    """A disabled-by-default writable DM NAX zone switch."""
+    """A writable DM NAX zone switch."""
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
@@ -175,6 +182,7 @@ class DmNaxZoneSwitch(DmNaxEntity, SwitchEntity):
             f"{DOMAIN}_{self._device_id}_{self._id}_{_slug(description.path)}"
         )
         self._attr_icon = description.icon
+        self._attr_entity_registry_enabled_default = description.enabled_default
 
     @property
     def name(self) -> str | None:
@@ -243,4 +251,3 @@ def _value_at(item: dict[str, Any], path: tuple[str, ...]) -> Any:
 def _slug(path: tuple[str, ...]) -> str:
     """Return a stable unique-id suffix from a property path."""
     return "_".join(part.lower() for part in path)
-

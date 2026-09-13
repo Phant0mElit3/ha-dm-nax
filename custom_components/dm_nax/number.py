@@ -34,6 +34,7 @@ class DmNaxZoneNumberDescription:
     scope: str = "audio"
     max_value_path: tuple[str, ...] | None = None
     support_path: tuple[str, ...] | None = None
+    enabled_default: bool = False
 
 
 DIRECT_NUMBER_DESCRIPTIONS = (
@@ -92,6 +93,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         icon="mdi:audio-input-rca",
         native_scale=0.1,
         support_path=("IsLineOutSupported",),
+        enabled_default=True,
     ),
     DmNaxZoneNumberDescription(
         key="Bass",
@@ -103,6 +105,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         native_unit_of_measurement="dB",
         icon="mdi:equalizer",
         native_scale=0.1,
+        enabled_default=True,
     ),
     DmNaxZoneNumberDescription(
         key="Treble",
@@ -114,6 +117,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         native_unit_of_measurement="dB",
         icon="mdi:equalizer",
         native_scale=0.1,
+        enabled_default=True,
     ),
     DmNaxZoneNumberDescription(
         key="Balance",
@@ -126,6 +130,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         icon="mdi:scale-balance",
         native_scale=0.1,
         support_path=("IsBalanceSupported",),
+        enabled_default=True,
     ),
     DmNaxZoneNumberDescription(
         key="DelayInms",
@@ -137,6 +142,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         native_unit_of_measurement="ms",
         icon="mdi:timer-outline",
         native_scale=1,
+        enabled_default=True,
     ),
     DmNaxZoneNumberDescription(
         key="DuckedVolume",
@@ -226,6 +232,7 @@ DIRECT_NUMBER_DESCRIPTIONS = (
         icon="mdi:speaker",
         native_scale=0.1,
         support_path=("IsSubTrimLevelSupported",),
+        enabled_default=True,
     ),
     DmNaxZoneNumberDescription(
         key="SpeakerPower",
@@ -359,10 +366,9 @@ async def async_setup_entry(
 
 
 class DmNaxZoneNumber(DmNaxEntity, NumberEntity):
-    """A disabled-by-default writable DM NAX zone number."""
+    """A writable DM NAX zone number."""
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_entity_registry_enabled_default = False
     _attr_mode = NumberMode.BOX
 
     def __init__(
@@ -377,6 +383,7 @@ class DmNaxZoneNumber(DmNaxEntity, NumberEntity):
             f"{DOMAIN}_{self._device_id}_{self._id}_{_slug(description.path)}"
         )
         self._attr_icon = description.icon
+        self._attr_entity_registry_enabled_default = description.enabled_default
         self._attr_native_min_value = description.native_min_value
         self._attr_native_step = description.native_step
         self._attr_native_unit_of_measurement = description.native_unit_of_measurement
@@ -455,4 +462,3 @@ def _value_at(item: dict[str, Any], path: tuple[str, ...]) -> Any:
 def _slug(path: tuple[str, ...]) -> str:
     """Return a stable unique-id suffix from a property path."""
     return "_".join(part.lower() for part in path)
-
