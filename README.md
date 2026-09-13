@@ -102,6 +102,9 @@ flow without deleting the integration or its entities.
 The media player's **AES67** source chooses the network-audio input; it does
 not identify which stream to receive. Version 0.3.0 adds an **AES67 Stream**
 select for each supported zone, such as **Living Room AES67 Stream**.
+Dropdown labels include the advertised source IP when available. NVX audio
+session names may look like `Stream01...` instead of the encoder's video name;
+use the source IP to identify the corresponding encoder.
 
 1. Choose the encoder's advertised audio session in the zone's **AES67 Stream** select.
 2. Select **AES67** in that zone media player's source list to hear it.

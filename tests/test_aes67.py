@@ -93,6 +93,17 @@ def test_options_disambiguate_names_and_reject_invalid_endpoints():
     }
 
 
+def test_options_include_valid_advertised_source_ip():
+    assert stream_options({"a": stream(SourceNetworkAddress="192.0.2.144")}) == {
+        "Off": None,
+        "Encoder [192.0.2.144]": "a",
+    }
+    assert stream_options({"a": stream(SourceNetworkAddress="invalid")}) == {
+        "Off": None,
+        "Encoder": "a",
+    }
+
+
 @pytest.mark.parametrize(
     "address,port",
     [("192.0.2.1", 5004), ("bad", 5004), ("239.0.0.1", True), ("239.0.0.1", 65536)],

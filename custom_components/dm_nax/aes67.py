@@ -56,13 +56,19 @@ def stream_stopped(stream: dict[str, Any]) -> bool:
 
 def stream_options(streams: dict[str, Any]) -> dict[str, str | None]:
     """Keep duplicate/reserved session names independently selectable."""
-    names = {
-        key: stream_name(value)
-        for key, value in streams.items()
-        if isinstance(value, dict)
-        and stream_endpoint(value)
-        and stream_name(value) is not None
-    }
+    names = {}
+    for key, value in streams.items():
+        if not isinstance(value, dict) or not stream_endpoint(value):
+            continue
+        if (name := stream_name(value)) is None:
+            continue
+        try:
+            source = ip_address(value.get("SourceNetworkAddress", ""))
+        except (ValueError, TypeError):
+            pass
+        else:
+            name = f"{name} [{source}]"
+        names[key] = name
     counts = Counter(names.values())
     options: dict[str, str | None] = {OFF: None}
     for key, name in sorted(names.items(), key=lambda pair: (pair[1], pair[0])):

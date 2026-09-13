@@ -6,7 +6,7 @@
   exposing a valid `NaxRxStream` reference. Uses the device's actual receiver
   mapping, not a guessed zone-to-stream number.
 - Discovers network audio streams through `NaxAudio.NaxSdp`, using session
-  names with duplicate-name disambiguation and multicast/port validation.
+  names, advertised source IPs, duplicate-name disambiguation and multicast/port validation.
 - Configures only the selected receive stream and verifies its reported
   address, port and started status. Serializes commands per receiver and
   bounds each running selection to 15 seconds.
