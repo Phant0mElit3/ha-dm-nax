@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4
+
+- Adds setup logging for zone number, switch, and select entity creation counts.
+- Uses explicit entity lists during platform setup to make registration behavior
+  easier to diagnose in Home Assistant logs.
+
 ## 0.2.3
 
 - Moves common zone controls out of Home Assistant's configuration entity

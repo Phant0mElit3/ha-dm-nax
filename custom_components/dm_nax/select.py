@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Any
 
 from homeassistant.components.select import SelectEntity
@@ -16,6 +17,8 @@ from .api import DmNaxApiError
 from .const import DOMAIN
 from .coordinator import DmNaxCoordinator
 from .entity import DmNaxEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -99,12 +102,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up DM NAX optional zone selects."""
     coordinator: DmNaxCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
+    entities = [
         DmNaxZoneSelect(coordinator, item, description)
         for item in coordinator.data.get("output_channels", [])
         for description in SELECT_DESCRIPTIONS
         if item.get("id") is not None and _description_supported(item, description)
+    ]
+    _LOGGER.info(
+        "Created %s DM NAX zone select entities across %s zones",
+        len(entities),
+        len(coordinator.data.get("output_channels", [])),
     )
+    async_add_entities(entities)
 
 
 class DmNaxZoneSelect(DmNaxEntity, SelectEntity):

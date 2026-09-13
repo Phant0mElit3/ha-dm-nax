@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -16,6 +17,8 @@ from .api import DmNaxApiError
 from .const import DOMAIN
 from .coordinator import DmNaxCoordinator
 from .entity import DmNaxEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -165,12 +168,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up DM NAX optional zone switches."""
     coordinator: DmNaxCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
+    entities = [
         DmNaxZoneSwitch(coordinator, item, description)
         for item in coordinator.data.get("output_channels", [])
         for description in SWITCH_DESCRIPTIONS
         if item.get("id") is not None and _description_supported(item, description)
+    ]
+    _LOGGER.info(
+        "Created %s DM NAX zone switch entities across %s zones",
+        len(entities),
+        len(coordinator.data.get("output_channels", [])),
     )
+    async_add_entities(entities)
 
 
 class DmNaxZoneSwitch(DmNaxEntity, SwitchEntity):
