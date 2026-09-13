@@ -22,6 +22,9 @@ READ_ENDPOINTS = {
     "av_matrix_routing": "/Device/AvMatrixRouting",
     "audio_ranges": "/Device/AudioRanges",
     "nax_audio": "/Device/NaxAudio",
+    "door_chimes": "/Device/DoorChimes",
+    "ducker_config": "/Device/DuckerConfig",
+    "streaming_services": "/Device/StreamingServices",
 }
 
 
@@ -63,6 +66,7 @@ class DmNaxApi:
         self._request_lock = asyncio.Lock()
         self._timeout = ClientTimeout(total=10, connect=5)
         self._rx_locks: dict[str, asyncio.Lock] = {}
+        self.include_media = False
 
     @property
     def base_url(self) -> str:
@@ -136,9 +140,56 @@ class DmNaxApi:
             inventory[primary] = payload
             if not payload.get("Device", {}).get(object_name, {}).get(child):
                 inventory[alternate] = await self._async_optional_object(alternate)
-        for key in ("av_matrix_routing", "audio_ranges", "nax_audio"):
+        for key in (
+            "av_matrix_routing",
+            "audio_ranges",
+            "nax_audio",
+            "door_chimes",
+            "ducker_config",
+        ):
             inventory[key] = await self._async_optional_object(key)
+        if self.include_media:
+            try:
+                inventory["streaming_services"] = await self._async_optional_object(
+                    "streaming_services"
+                )
+            except DmNaxAuthError:
+                raise
+            except DmNaxApiError:
+                _LOGGER.warning(
+                    "Streaming service discovery failed; zone controls remain available"
+                )
         return inventory
+
+    async def async_play_chime(self, collection: str, key: str) -> None:
+        """Activate an existing chime without altering its configured playback zones."""
+        if collection not in ("DefaultChimes", "CustomChimes") or not key.isalnum():
+            raise DmNaxApiError("Invalid chime reference")
+        payload = await self.async_get(READ_ENDPOINTS["door_chimes"])
+        chime = (
+            payload.get("Device", {}).get("DoorChimes", {}).get(collection, {}).get(key)
+        )
+        if not isinstance(chime, dict):
+            raise DmNaxApiError("The selected chime no longer exists")
+        if chime.get("PlaybackInProgress") is True:
+            raise DmNaxApiError("This chime is already playing")
+        await self.async_post_device(
+            {"Device": {"DoorChimes": {collection: {key: {"Play": True}}}}}
+        )
+
+    async def async_set_ducker_value(
+        self, output: str, path: Sequence[str], value: Any
+    ):
+        """Write one capability-checked ducker property using its reported object ID."""
+        return await self.async_post_device(
+            {
+                "Device": {
+                    "DuckerConfig": {
+                        "DuckerOutputs": {output: _nested_payload(path, value)}
+                    }
+                }
+            }
+        )
 
     async def async_get(self, path: str) -> dict[str, Any]:
         """Read a CresNext object path."""

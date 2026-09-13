@@ -54,7 +54,9 @@ def stream_stopped(stream: dict[str, Any]) -> bool:
     )
 
 
-def stream_options(streams: dict[str, Any]) -> dict[str, str | None]:
+def stream_options(
+    streams: dict[str, Any], aliases: dict[str, str] | None = None
+) -> dict[str, str | None]:
     """Keep duplicate/reserved session names independently selectable."""
     names = {}
     for key, value in streams.items():
@@ -67,6 +69,7 @@ def stream_options(streams: dict[str, Any]) -> dict[str, str | None]:
         except (ValueError, TypeError):
             pass
         else:
+            name = (aliases or {}).get(str(source), name)
             name = f"{name} [{source}]"
         names[key] = name
     counts = Counter(names.values())

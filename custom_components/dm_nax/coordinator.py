@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+from contextlib import suppress
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -33,6 +35,28 @@ class DmNaxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=scan_interval,
         )
         self.api = api
+        self.stream_aliases: dict[str, str] = {}
+        self.media = None
+        self._media_retry_at = 0.0
+        self._media_connect_task = None
+
+    async def async_close_media(self):
+        if self._media_connect_task:
+            self._media_connect_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._media_connect_task
+            self._media_connect_task = None
+        if self.media:
+            await self.media.close()
+
+    async def _connect_media(self):
+        try:
+            await self.media.connect()
+        except DmNaxApiError:
+            self._media_retry_at = self.hass.loop.time() + 60
+            _LOGGER.warning(
+                "Media Player 2 unavailable; zone routing remains operational"
+            )
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -42,6 +66,15 @@ class DmNaxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except DmNaxApiError as err:
             raise UpdateFailed(str(err)) from err
         device = _device_object(inventory)
+        if (
+            self.media
+            and not self.media.connected
+            and self.hass.loop.time() >= self._media_retry_at
+            and (self._media_connect_task is None or self._media_connect_task.done())
+        ):
+            self._media_connect_task = self.hass.async_create_background_task(
+                self._connect_media(), "DM NAX Media Player 2 reconnect"
+            )
         device_info = _object_at(device, "DeviceInfo")
         input_channels = _input_items(device)
         output_channels = _output_items(device)
@@ -63,6 +96,9 @@ class DmNaxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "output_channels": outputs,
             "routes": routes,
             "audio_ranges": _object_at(device, "AudioRanges"),
+            "door_chimes": _object_at(device, "DoorChimes"),
+            "ducker_outputs": _object_at(device, "DuckerConfig", "DuckerOutputs"),
+            "streaming_services": _object_at(device, "StreamingServices"),
             "nax_rx_streams": _object_at(device, "NaxAudio", "NaxRx", "NaxRxStreams"),
             "nax_sdp_streams": _object_at(
                 device, "NaxAudio", "NaxSdp", "NaxSdpStreams"

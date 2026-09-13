@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0b1 (Prerelease)
+
+- Adds local AES67 aliases, capability-detected stream/signal/amplifier-fault
+  sensors, and allowlisted diagnostics without raw configuration or credentials.
+- Adds playback buttons for configured default/custom chimes and recorded
+  announcements, preserving hardware-configured destinations and levels.
+- Adds optional DuckerConfig timing, attenuation, threshold, bypass/active,
+  reference-input and gain controls. Advanced controls are disabled by default.
+- Adds an opt-in NVX-to-NAX audio-follow blueprint with independent-music protection.
+- Adds experimental Media Player 2 play/pause, track information, authenticated
+  provider browsing and signed-content playback on separate streaming entities.
+  Requires MP2 mode and separate client credentials; disabled by default.
+- Keeps mode changes, reboot, account registration, file upload, arbitrary-URL
+  playback and dynamic TTS out of scope. No live routing changes are made by setup.
+- Existing 0.3.0 AES67 switching is now confirmed working by the user. New media,
+  chime and ducking command workflows still require hardware validation.
+
 ## 0.3.0
 
 - Adds a separate enabled AES67 Stream select for each independent output

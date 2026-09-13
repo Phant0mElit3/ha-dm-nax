@@ -47,10 +47,19 @@
   "options": {
     "step": {
       "init": {
+        "description": "Stream aliases map encoder IP addresses to friendly names. Media Player 2 is optional and requires MP2 mode and a separately created client UUID/secret. This integration never changes device mode or creates credentials. Leave the secret blank to keep the saved value.",
         "data": {
-          "scan_interval": "Polling interval in seconds"
+          "scan_interval": "Polling interval in seconds",
+          "stream_aliases": "AES67 source IP to friendly name",
+          "enable_media_player": "Enable Media Player 2 (experimental)",
+          "media_client_id": "Media Player 2 client UUID",
+          "media_client_secret": "Media Player 2 client secret"
         }
       }
+    },
+    "error": {
+      "invalid_aliases": "Enter an object mapping valid IP addresses to printable names of 1-60 characters.",
+      "invalid_media_credentials": "Media Player 2 requires HTTPS, a valid client UUID, and its base64-encoded 32-byte secret. These are separate from the web UI login."
     }
   }
 }

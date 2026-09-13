@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ipaddress import ip_address
 from typing import Any
 
 import voluptuous as vol
@@ -25,6 +26,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
+from .media import validate_credentials
 
 
 class DmNaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -143,23 +145,83 @@ class DmNaxOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.FlowResult:
         """Manage options."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        current = self.config_entry.options or self.config_entry.data
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_SCAN_INTERVAL,
-                        default=current.get(
-                            CONF_SCAN_INTERVAL,
-                            int(DEFAULT_SCAN_INTERVAL.total_seconds()),
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
+            try:
+                aliases = user_input.get("stream_aliases", {})
+                if not isinstance(aliases, dict):
+                    raise TypeError
+                normalized_aliases = {
+                    str(ip_address(key)): _alias(value)
+                    for key, value in aliases.items()
                 }
-            ),
+                if "stream_aliases" in user_input:
+                    user_input["stream_aliases"] = normalized_aliases
+            except (ValueError, TypeError):
+                return self.async_show_form(
+                    step_id="init",
+                    data_schema=self._schema(),
+                    errors={"base": "invalid_aliases"},
+                )
+            data = {**self.config_entry.options, **user_input}
+            if not user_input.get("media_client_secret"):
+                data["media_client_secret"] = self.config_entry.options.get(
+                    "media_client_secret", ""
+                )
+                if not data["media_client_secret"]:
+                    data.pop("media_client_secret")
+            if data.get("enable_media_player"):
+                try:
+                    validate_credentials(
+                        data.get("media_client_id", ""),
+                        data.get("media_client_secret", ""),
+                    )
+                    if not self.config_entry.data.get(CONF_USE_SSL, True):
+                        raise ValueError("Media Player 2 requires HTTPS")
+                except (ValueError, TypeError):
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._schema(),
+                        errors={"base": "invalid_media_credentials"},
+                    )
+            return self.async_create_entry(title="", data=data)
+
+        return self.async_show_form(step_id="init", data_schema=self._schema())
+
+    def _schema(self):
+        current = self.config_entry.options or self.config_entry.data
+        return vol.Schema(
+            {
+                vol.Optional(
+                    "enable_media_player",
+                    default=current.get("enable_media_player", False),
+                ): bool,
+                vol.Optional(
+                    "media_client_id", default=current.get("media_client_id", "")
+                ): str,
+                vol.Optional("media_client_secret"): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+                vol.Optional(
+                    "stream_aliases", default=current.get("stream_aliases", {})
+                ): selector.ObjectSelector(),
+                vol.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=current.get(
+                        CONF_SCAN_INTERVAL,
+                        int(DEFAULT_SCAN_INTERVAL.total_seconds()),
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
+            }
         )
+
+
+def _alias(value):
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value.strip()) <= 60
+        or not value.isprintable()
+    ):
+        raise ValueError("Invalid stream alias")
+    return value.strip()
 
 
 async def _async_validate_input(

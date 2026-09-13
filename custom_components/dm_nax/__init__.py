@@ -18,6 +18,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from yarl import URL
 
 from .api import DmNaxApi
 from .const import (
@@ -28,6 +29,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import DmNaxCoordinator
+from .media import DmNaxMedia
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,17 +82,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api,
         scan_interval=scan_interval,
     )
+    coordinator.stream_aliases = entry.options.get("stream_aliases", {})
+    if entry.options.get("enable_media_player") and entry.data.get(CONF_USE_SSL, True):
+        api.include_media = True
+        coordinator.media = DmNaxMedia(
+            session,
+            str(URL(api.base_url).with_scheme("wss").with_path("/subscriptionmgr")),
+            entry.options.get("media_client_id", ""),
+            entry.options.get("media_client_secret", ""),
+            verify_ssl,
+            coordinator.async_update_listeners,
+        )
     try:
         await coordinator.async_config_entry_first_refresh()
     except Exception:
+        await coordinator.async_close_media()
         await api.async_close()
         raise
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
-    await hass.config_entries.async_forward_entry_setups(
-        entry,
-        [Platform(platform) for platform in PLATFORMS],
-    )
+    try:
+        await hass.config_entries.async_forward_entry_setups(
+            entry,
+            [Platform(platform) for platform in PLATFORMS],
+        )
+    except Exception:
+        await coordinator.async_close_media()
+        await api.async_close()
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        raise
     entry.async_on_unload(entry.add_update_listener(_async_reload_options))
     _LOGGER.info("DM NAX integration set up for host %s", entry.data[CONF_HOST])
     return True
@@ -104,6 +124,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     if unload_ok:
         coordinator: DmNaxCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        await coordinator.async_close_media()
         await coordinator.api.async_close()
     return unload_ok
 

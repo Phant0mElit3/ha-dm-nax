@@ -1,0 +1,99 @@
+blueprint:
+  name: NVX video to NAX audio (optional)
+  description: >-
+    Follow confirmed NVX source changes using an explicit source-to-encoder-IP map.
+    Does not alter volume or mute. Unknown, Off, and unmapped routes do nothing.
+    The default preserves music from other NAX inputs. No automation is installed automatically.
+  domain: automation
+  input:
+    enabled:
+      name: Audio-follow toggle
+      selector:
+        entity:
+          domain: input_boolean
+    video_source:
+      name: NVX video source select
+      selector:
+        entity:
+          domain: select
+          integration: crestron_nvx
+    audio_stream:
+      name: NAX zone AES67 Stream select
+      selector:
+        entity:
+          domain: select
+          integration: dm_nax
+    zone:
+      name: NAX zone media player
+      selector:
+        entity:
+          domain: media_player
+          integration: dm_nax
+    source_map:
+      name: NVX source label to encoder IP
+      description: 'Example: {"Apple TV": "192.0.2.10", "Cable": "192.0.2.11"}. Use exact NVX option labels.'
+      selector:
+        object:
+    take_over_music:
+      name: Allow switching from other inputs to AES67
+      default: false
+      selector:
+        boolean:
+    aes67_input:
+      name: Zone source option for AES67
+      default: AES67
+      selector:
+        text:
+mode: queued
+max: 5
+triggers:
+  - trigger: state
+    entity_id: !input video_source
+    to: null
+variables:
+  enabled_entity: !input enabled
+  video_entity: !input video_source
+  stream_entity: !input audio_stream
+  zone_entity: !input zone
+  source_map: !input source_map
+  take_over_music: !input take_over_music
+  aes67_input: !input aes67_input
+conditions:
+  - &can_follow
+    condition: template
+    value_template: >-
+      {{ is_state(enabled_entity, 'on') and trigger.from_state is not none
+         and trigger.from_state.state not in ['unknown', 'unavailable']
+         and trigger.to_state is not none
+         and trigger.to_state.state not in ['unknown', 'unavailable', 'Off']
+         and states(video_entity) == trigger.to_state.state
+         and source_map is mapping and trigger.to_state.state in source_map
+         and (take_over_music or state_attr(zone_entity, 'source') == aes67_input) }}
+actions:
+  - *can_follow
+  - variables:
+      encoder_ip: "{{ source_map[trigger.to_state.state] }}"
+      candidates: >-
+        {% set ns = namespace(matches=[]) %}
+        {% for option in state_attr(stream_entity, 'options') or [] %}
+          {% if '[' ~ encoder_ip ~ ']' in option %}
+            {% set ns.matches = ns.matches + [option] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.matches }}
+  - condition: template
+    value_template: "{{ candidates | count == 1 }}"
+  - action: select.select_option
+    target:
+      entity_id: !input audio_stream
+    data:
+      option: "{{ candidates[0] }}"
+  - condition: template
+    value_template: >-
+      {{ take_over_music and is_state(enabled_entity, 'on')
+         and states(video_entity) == trigger.to_state.state }}
+  - action: media_player.select_source
+    target:
+      entity_id: !input zone
+    data:
+      source: "{{ aes67_input }}"

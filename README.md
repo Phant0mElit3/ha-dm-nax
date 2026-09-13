@@ -8,6 +8,12 @@ custom HACS repository until more models and firmware versions have been tested.
 
 Tested live against a `DM-NAX-8ZSA` running firmware `3.2.0121.01081`.
 
+**0.4.0b1 is a prerelease.** It adds stream aliases, diagnostics, configured
+chime/recorded-announcement playback, advanced ducking, an optional audio-follow
+blueprint, and experimental Media Player 2 transport/browsing. Media Player 2
+requires separate device-side preparation and credentials; it is off by default.
+See [new controls and setup requirements](docs/MEDIA_AND_AUTOMATION.md).
+
 ## Installation With HACS
 
 1. In Home Assistant, open HACS.
@@ -131,8 +137,8 @@ configuration.
 Only outputs with an explicit receiver mapping are supported initially.
 Existing entity IDs and source options remain unchanged. Update and fully
 restart Home Assistant; removing/re-adding the integration is unnecessary.
-The new controls are regression-tested; live end-to-end audio validation after
-installation remains necessary. No NVX-to-NAX follow automation is enabled.
+The user confirmed end-to-end NVX-to-NAX AES67 switching after installing 0.3.0.
+No NVX-to-NAX follow automation is enabled automatically.
 
 References: [NaxAudio API](https://sdkcon78221.crestron.com/sdk/DM_NAX_REST_API/Content/Topics/Objects/NaxAudio.htm)
 and [ZoneOutputs mapping](https://sdkcon78221.crestron.com/sdk/DM_NAX_REST_API/Content/Topics/Objects-NAX/ZoneOutputs.htm).
@@ -193,8 +199,11 @@ Fully restart Home Assistant after installing an integration update.
   by the older bug; disable unwanted PEQ entities manually in HA.
 - Bundled original brand icons display on Home Assistant 2026.3 and newer.
   See [HA brand-image documentation](https://developers.home-assistant.io/docs/core/integration/brand_images/).
-- This maintenance release does not add fault/signal sensor entities, input
-  controls, push updates, chime playback, or unverified advanced ducking controls.
+- 0.4.0b1 adds capability-detected signal/fault and AES67 sensors, chime buttons,
+  and DuckerConfig controls. Zone routing still polls; the optional Media Player 2
+  connection receives streaming-player telemetry over WebSocket.
+- Playback controls operate on NAX streaming engines, not on external NVX HDMI
+  sources. Pausing an AES67 input's upstream source remains outside this integration.
 
 ## Testing
 

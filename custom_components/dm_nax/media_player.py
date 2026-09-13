@@ -22,6 +22,7 @@ from .api import DmNaxApiError
 from .const import DOMAIN
 from .coordinator import DmNaxCoordinator
 from .entity import DmNaxEntity
+from .stream_player import setup_players
 
 DM_NAX_VOLUME_MAX = 1000
 OPTIMISTIC_VOLUME_TIMEOUT = 2
@@ -34,6 +35,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up DM NAX output channel media players."""
     coordinator: DmNaxCoordinator = hass.data[DOMAIN][entry.entry_id]
+    setup_players(coordinator, entry, async_add_entities)
     async_add_entities(
         DmNaxOutputChannel(coordinator, item)
         for item in coordinator.data.get("output_channels", [])

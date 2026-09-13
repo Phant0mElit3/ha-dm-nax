@@ -174,7 +174,10 @@ class DmNaxAes67StreamSelect(DmNaxEntity, SelectEntity):
         return super().available and self._receiver_id is not None
 
     def _options(self):
-        return stream_options(self.coordinator.data.get("nax_sdp_streams", {}))
+        return stream_options(
+            self.coordinator.data.get("nax_sdp_streams", {}),
+            self.coordinator.stream_aliases,
+        )
 
     @property
     def options(self):

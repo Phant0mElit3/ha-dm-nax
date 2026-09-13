@@ -26,6 +26,7 @@ from .controls import (
     value_at as _value_at,
 )
 from .coordinator import DmNaxCoordinator
+from .ducker import setup_duckers
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -370,6 +371,7 @@ async def async_setup_entry(
     async_setup_controls(
         coordinator, entry, async_add_entities, NUMBER_DESCRIPTIONS, DmNaxZoneNumber
     )
+    setup_duckers(coordinator, entry, async_add_entities, "number")
 
 
 class DmNaxZoneNumber(DmNaxControlEntity, NumberEntity):
