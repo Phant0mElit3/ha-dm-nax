@@ -1,17 +1,64 @@
 # Crestron DM NAX for Home Assistant
 
-Home Assistant custom integration for Crestron DM NAX audio devices using the local CresNext REST API.
+Local polling Home Assistant integration for Crestron DM NAX audio devices using
+the local CresNext REST API.
 
-This integration has been tested against a `DM-NAX-8ZSA` running firmware `3.2.0121.01081`.
+This project is early and was built against a live DM NAX device. Use it as a
+custom HACS repository until more models and firmware versions have been tested.
 
-## Features
+Tested live against a `DM-NAX-8ZSA` running firmware `3.2.0121.01081`.
 
-- UI config flow.
-- HTTPS login using the DM NAX web UI credentials.
-- Local polling.
-- One `media_player` entity per zone.
-- Zone volume, mute, and source selection.
-- Optional disabled-by-default zone controls:
+## Installation With HACS
+
+1. In Home Assistant, open HACS.
+2. Open the three-dot menu and choose **Custom repositories**.
+3. Add this repository URL:
+
+   ```text
+   https://github.com/Phant0mElit3/ha-dm-nax
+   ```
+
+4. Select category **Integration**.
+5. Install **Crestron DM NAX**.
+6. Restart Home Assistant.
+7. Add the integration from **Settings > Devices & services**.
+
+## Manual Installation
+
+Copy `custom_components/dm_nax` into your Home Assistant config folder:
+
+```text
+/config/custom_components/dm_nax
+```
+
+Then restart Home Assistant.
+
+## Configuration
+
+The integration supports UI setup from **Settings > Devices & services**.
+
+You will need:
+
+- DM NAX host or IP address
+- Web UI username
+- Web UI password
+- HTTPS setting
+- SSL verification setting
+- Polling interval
+
+Most DM NAX devices use a self-signed certificate, so SSL verification is
+usually left disabled.
+
+## Current Coverage
+
+- Device metadata from `/Device/DeviceInfo`
+- Input source discovery from `/Device/InputSources`
+- Zone discovery and state from `/Device/ZoneOutputs`
+- Audio ranges from `/Device/AudioRanges`
+- Source routing from `/Device/AvMatrixRouting`
+- Zone media players with volume, mute, source list, and source select
+- Optimistic Home Assistant volume state after accepted volume commands
+- Optional disabled-by-default zone configuration entities:
   - Bass
   - Treble
   - Balance
@@ -27,44 +74,32 @@ This integration has been tested against a `DM-NAX-8ZSA` running firmware `3.2.0
   - Line out EQ bypass
   - Ducking
 
-## HACS Installation
+## Known Notes
 
-1. Open HACS.
-2. Go to **Integrations**.
-3. Open the three-dot menu and choose **Custom repositories**.
-4. Add this repository URL.
-5. Choose category **Integration**.
-6. Install **Crestron DM NAX**.
-7. Restart Home Assistant.
+- The integration targets current DM NAX firmware objects: `ZoneOutputs`,
+  `InputSources`, and `AvMatrixRouting`.
+- Older object names such as `InputChannels` and `OutputChannels` are kept as
+  fallbacks where possible.
+- Optional zone tuning entities are disabled by default because they are
+  configuration-style controls rather than everyday dashboard controls.
+- PEQ bands and speaker/amp configuration are not exposed yet. They are
+  intentionally left out until more live testing confirms safe behavior.
 
-## Manual Installation
+## Crestron API
 
-Copy `custom_components/dm_nax` into your Home Assistant config directory:
+DM NAX REST API quick start:
 
-```text
-/config/custom_components/dm_nax
-```
+https://sdkcon78221.crestron.com/sdk/DM_NAX_REST_API/Content/Topics/Quick-Start-2.htm
 
-Restart Home Assistant.
+## Trademark Notice
 
-## Setup
+This project is an independent Home Assistant custom integration and is not
+affiliated with, endorsed by, sponsored by, or supported by Crestron Electronics,
+Inc.
 
-1. Go to **Settings** -> **Devices & services**.
-2. Choose **Add integration**.
-3. Search for **Crestron DM NAX**.
-4. Enter:
-   - Host or IP address
-   - Username
-   - Password
-   - HTTPS setting
-   - SSL verification setting
-   - Polling interval
+Crestron, DM NAX, and related names, marks, logos, and images are the property
+of Crestron Electronics, Inc. The MIT license applies to the original
+integration source code only and does not grant rights to Crestron trademarks,
+logos, images, or other third-party assets.
 
-Most DM NAX devices use a self-signed certificate, so SSL verification is usually left disabled.
-
-## Notes
-
-The integration uses the `ZoneOutputs`, `InputSources`, and `AvMatrixRouting` objects on current DM NAX firmware. Older object names such as `InputChannels` and `OutputChannels` are kept as fallbacks.
-
-Optional zone tuning entities are disabled by default because they are configuration-style controls rather than everyday dashboard controls.
-
+See [NOTICE](NOTICE) for the trademark notice.

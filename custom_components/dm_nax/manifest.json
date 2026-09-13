@@ -1,12 +1,12 @@
 {
   "domain": "dm_nax",
   "name": "Crestron DM NAX",
-  "codeowners": [],
+  "codeowners": ["@Phant0mElit3"],
   "config_flow": true,
-  "documentation": "https://sdkcon78221.crestron.com/sdk/DM_NAX_REST_API/Content/Topics/Quick-Start-2.htm",
+  "documentation": "https://github.com/Phant0mElit3/ha-dm-nax",
   "integration_type": "hub",
   "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Phant0mElit3/ha-dm-nax/issues",
   "requirements": [],
   "version": "0.1.0"
 }
-

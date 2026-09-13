@@ -1,7 +1,4 @@
 {
   "name": "Crestron DM NAX",
-  "render_readme": true,
-  "domains": ["media_player", "number", "switch"],
-  "homeassistant": "2024.6.0"
+  "render_readme": true
 }
-
