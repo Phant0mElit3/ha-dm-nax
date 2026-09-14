@@ -3,9 +3,11 @@
 import json
 import logging
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import yaml
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import EntityPlatform
 from test_aes67 import stream
@@ -27,6 +29,25 @@ from custom_components.dm_nax.ducker import (
     DmNaxDuckerNumber,
     DmNaxDuckerSwitch,
 )
+
+
+def test_options_help_translation_and_alias_example():
+    integration = Path(config_flow.__file__).parent
+    strings = json.loads((integration / "strings.json").read_text())
+    english = json.loads((integration / "translations/en.json").read_text())
+    assert strings == english
+    description = english["options"]["step"]["init"]["description"]
+    example = description.partition("```yaml\n")[2].partition("```")[0]
+    aliases = yaml.safe_load(example)
+    assert isinstance(aliases, dict) and len(aliases) == 2
+    discovered = {
+        str(index): stream(SourceNetworkAddress=address)
+        for index, address in enumerate(aliases)
+    }
+    labels = stream_options(discovered, aliases)
+    for index, (address, name) in enumerate(aliases.items()):
+        assert config_flow._alias(name) == name
+        assert labels[f"{name} [{address}]"] == str(index)
 
 
 def test_aliases_preserve_discovery_id_and_address():

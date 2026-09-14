@@ -2,8 +2,8 @@
 
 ## Prerelease Installation
 
-0.4.0b1 is an opt-in prerelease. In HACS, open the NAX repository's download/version
-dialog and enable prerelease versions if needed, then select 0.4.0b1 and restart
+0.4.0b2 is an opt-in prerelease. In HACS, open the NAX repository's download/version
+dialog and enable prerelease versions if needed, then select 0.4.0b2 and restart
 Home Assistant. Stable 0.3.0 remains available. Existing zone entities and their
 identifiers are retained. No device mode, music account, volume, mute, routing,
 or automatic audio-follow settings are changed during installation.
@@ -15,17 +15,40 @@ confirmed working by the user on the previously documented setup.
 
 ## Friendly AES67 Names
 
-Open NAX **Configure** and enter a mapping under **AES67 source IP to friendly
-name**, for example:
+This is an optional Home Assistant display setting, not a hardware rename or a
+new stream. It requires 0.4.0b1 or a later version containing stream aliases.
+
+1. Open **Settings > Devices & services > Crestron DM NAX** in Home Assistant.
+2. Select **Configure** for the NAX entry, not the NVX integration or the device's
+   web interface.
+3. Find **AES67 source IP to friendly name**. Replace an empty mapping in that
+   field's editor with the example below, using your own encoder IP addresses
+   and preferred names. Do not add this to `configuration.yaml`.
 
 ```json
-{"192.0.2.10": "Apple TV", "192.0.2.11": "Cable"}
+{
+  "192.0.2.10": "Apple TV",
+  "192.0.2.11": "Cable"
+}
 ```
 
-Use the encoder's advertised source IP, not its multicast address. The dropdown
-will show `Apple TV [192.0.2.10]`. Names are local to HA; stream session names on
-the hardware are unchanged. Duplicate feeds remain disambiguated. Automations
-that select an option by its full label must be updated when an alias changes.
+4. Leave Media Player 2 and polling settings unchanged, then select **Submit**.
+   The integration reloads automatically; changing aliases does not require a
+   Home Assistant restart.
+5. Open the NAX device's zone **AES67 Stream** selector. The example produces
+   `Apple TV [192.0.2.10]` and `Cable [192.0.2.11]`. The separate zone **Source**
+   selector still says **AES67**. Saving names does not switch either selector.
+
+Use the encoder's advertised source IP, not the NAX IP or a multicast address.
+Each name must contain 1-60 printable characters. Without a matching alias the
+advertised stream name remains visible. Enter an empty object (`{}`) to remove
+all aliases. An alias cannot make an undiscovered stream appear. Names apply
+to stream selectors within this NAX integration entry, not other integrations.
+Duplicate feeds remain disambiguated. Update the mapping if an encoder IP changes,
+and update automations that select an option by its full label after renaming.
+
+If the field is missing, check the installed version in HACS. After installing
+an updated integration version, restart Home Assistant before opening Configure.
 
 ## Diagnostics
 
@@ -41,15 +64,28 @@ Receive-started status does not itself prove audible sound.
 
 ## Chimes and Recorded Announcements
 
-Configure default/custom chimes, recordings, playback zones, repetition and
-duration in the **NAX web interface** first. A **Chime <name>** button appears in
+Configure the available chimes and their playback zones in the **NAX web
+interface** first. Repetition and duration controls depend on firmware. A
+**Chime <name>** button appears in
 HA for each reported playable slot. Press it or call `button.press` from an
 automation. Playback uses the destinations already configured on that slot,
 which can include multiple rooms. Its HA attributes list reported playback zones.
 
-For spoken announcements, upload/configure a recording as a custom chime using
-the NAX web interface. This release does not upload files, accept arbitrary URLs,
-implement dynamic TTS, or emulate announcement mixing by replacing a music source.
+Custom-slot playback is supported only when the device reports playable
+`CustomChimes` entries; this does not imply support for creating or uploading
+recordings. This release does not upload files, accept arbitrary URLs, implement
+dynamic TTS, or emulate announcement mixing by replacing a music source.
+
+Read-only hardware inspection on 2026-09-13 of a DM-NAX-8ZSA running
+3.2.0121.01081 found 26 built-in chimes and no upload control in the Chimes UI.
+`DoorChimes` version 2.0.5 reported only `DefaultChimes`, with `FilterType` set
+to `All`; no `CustomChimes` collection was present. `FileMgmnt.FileEntries`
+listed only `SpeakerProfiles`, and `FilePaths` exposed a generic file staging
+path but no chime-specific path. These observations do not establish a supported
+custom-chime upload workflow. Do not upload audio through the speaker-profile
+importer or overwrite built-in chime files. Custom recordings need a verified
+vendor-supported provisioning method before they can be tested here.
+
 The REST API recommends using the web interface for chime configuration; HA sends
 only the documented `Play` trigger and refreshes feedback. Acceptance of that
 trigger is not proof that each target speaker emitted sound.
@@ -100,17 +136,102 @@ blueprint does not create or enable an automation.
 Do not enable this simply to listen to NVX AES67 audio. It is for the NAX's own
 streaming music players, and requires the device to run **Media Player 2**.
 
-Review [Crestron's MP2 setup guide](https://sdkcon78221.crestron.com/sdk/Media-Player-API/Content/Topics/Quick-Start/Make-API-Calls.htm)
-before making changes. Checking the current mode is read-only; switching modes
-reboots the device and can affect existing music workflows. Create a dedicated
-client using the documented device console procedure. The resulting UUID and
-secret are **not** the web UI username/password. The integration does not switch
-modes, reboot, create clients, or register music-service accounts.
+MP2 is the device's newer built-in music-player system and control API, not an
+audio format or a Home Assistant audio server. With this option enabled, Home
+Assistant acts as a remote: it sends player commands and receives player-state
+updates over an authenticated local WebSocket connection. The NAX plays the
+music; Home Assistant does not relay its audio. Our implementation exposes
+play/pause, reported track information, and browsing/playback for supported
+providers already configured on the NAX.
 
-Enter that client UUID and secret in NAX **Configure**, and enable the experimental
-Media Player 2 option. HTTPS must already be enabled. The existing certificate
-verification preference is retained. Leave the secret blank on subsequent option
-edits to retain it; it is excluded from diagnostics.
+Think of two independent controls: a **Streaming PlayerXX** entity controls what
+an internal player plays, while a zone's **Source** control decides whether that
+room hears that player. If several rooms use the same player, pausing it affects
+all of them. NVX AES67 routing is separate: MP2 does not control the external
+source feeding an NVX encoder, improve AES67 switching, or add custom-chime uploads.
+The Home Assistant checkbox connects to an already prepared MP2 system; it does
+not enable MP2 mode on the hardware.
+
+### Prepare the NAX
+
+This feature is experimental and has not yet been verified against a physical
+MP2 installation. Do this during a maintenance window: changing player modes
+reboots the NAX and may affect existing music/control-system workflows. Confirm
+compatibility with any existing controller before changing modes. The integration
+does not switch modes, reboot, create clients, or register music-service accounts.
+
+1. Open an SSH console to the NAX, or use **Text Console** in Crestron Toolbox.
+   For SSH, replace `YOUR_USERNAME` and `NAX_IP` with the device's authorized
+   console login and address: `ssh YOUR_USERNAME@NAX_IP`. Enter the password
+   interactively; do not put it in the command. If console access is unavailable,
+   resolve that with the device administrator rather than weakening security.
+2. At the device prompt, run the read-only command:
+
+   ```text
+   mediaplayer
+   ```
+
+3. If it reports MP2, skip the mode change. If it reports MP1, run the following
+   only when ready for an immediate reboot and audio interruption, then wait for
+   the NAX to return, reconnect, and run `mediaplayer` again to confirm MP2:
+
+   ```text
+   mediaplayer MP2
+   ```
+
+If the firmware does not recognize these commands, stop and verify model/firmware
+support with Crestron. A firmware upgrade is not performed by this integration.
+These mode commands follow [Crestron's MP2 setup guide](https://sdkcon78221.crestron.com/sdk/Media-Player-API/Content/Topics/Quick-Start/Make-API-Calls.htm).
+
+4. Create a dedicated Home Assistant client once, unless you already have its
+   saved credentials:
+
+   ```text
+   createclient homeassistant
+   ```
+
+5. Keep the returned **UUID** and **Secret** securely. They authorize the client;
+   do not post them in issues, screenshots, or logs. Use the complete returned
+   Secret, including any trailing `=`. Do not generate a replacement UUID or
+   encode the Secret again. They are separate from the web UI username/password.
+   See [Crestron's client authentication commands](https://sdkcon78221.crestron.com/sdk/Media-Player-API/Content/Topics/Quick-Start/Client-Authentication-Commands.htm).
+
+### Enter the Home Assistant Options
+
+1. Open **Settings > Devices & services > Crestron DM NAX**.
+2. The entry must already use **Use HTTPS**. If it does not, use the entry's
+   **Reconfigure** action to update the connection, first confirming HTTPS works
+   on the NAX. Keep the existing certificate-verification policy; MP2 uses it too.
+3. Select **Configure** and fill in the following fields:
+
+   | Field | Value |
+   | --- | --- |
+   | Enable Media Player 2 (experimental) | On, after confirming device MP2 mode |
+   | Media Player 2 client UUID | UUID returned by `createclient` |
+   | Media Player 2 client secret | Secret returned by `createclient` |
+   | AES67 source IP to friendly name | Leave existing aliases unchanged |
+   | Polling interval in seconds | Leave existing value unchanged |
+
+4. Select **Submit**. The integration reloads and attempts the separate MP2
+   connection. Saving options validates credential format, not successful device
+   authentication. No Postman setup or manual authorization-header script is
+   needed; the integration handles signing and WebSocket registration.
+5. On later edits, a blank secret field retains the stored secret. To stop using
+   MP2, turn off its enable option; this does not revoke credentials or change
+   the device's player mode.
+
+### Verify Playback
+
+Open the NAX device in Home Assistant and look for **Streaming PlayerXX** entities.
+Confirm that one becomes available. Music-service accounts must already be
+configured on the NAX using the vendor-supported setup for that provider. Start
+with an existing working service, then check metadata and available play/pause
+controls before testing media browsing. Browser contents depend on the provider.
+
+If players are missing or unavailable, verify device MP2 mode, HTTPS connectivity
+from Home Assistant, and the dedicated UUID/Secret pair. Review Home Assistant's
+DM NAX logs without sharing secrets. Saving the form alone does not prove MP2
+works; this hardware validation is still pending on our test installation.
 
 When connected, separate **Streaming PlayerXX** media players appear. These are
 streaming engines rather than zones: multiple rooms may be listening to the same

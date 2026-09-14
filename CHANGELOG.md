@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0b2 (Prerelease)
+
+- Adds an encoder-IP-to-name example and explains friendly AES67 aliases directly
+  in the Home Assistant options dialog, including which dropdown they affect.
+- Explains what optional Media Player 2 does, its separate credentials and setup,
+  and the distinction between player controls and zone routing.
+- Adds step-by-step alias and MP2 configuration guides and links from the dialog
+  and README. Warns that changing device player mode reboots the NAX.
+- Corrects custom-chime upload guidance based on read-only hardware inspection:
+  no supported upload workflow was found on the tested DM-NAX-8ZSA firmware.
+- Tests the displayed alias example and English translation consistency.
+- No playback, routing, authentication, or device-mode behavior changes. MP2
+  remains experimental and requires physical-device validation.
+
 ## 0.4.0b1 (Prerelease)
 
 - Adds local AES67 aliases, capability-detected stream/signal/amplifier-fault

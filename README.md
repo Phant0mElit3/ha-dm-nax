@@ -8,11 +8,13 @@ custom HACS repository until more models and firmware versions have been tested.
 
 Tested live against a `DM-NAX-8ZSA` running firmware `3.2.0121.01081`.
 
-**0.4.0b1 is a prerelease.** It adds stream aliases, diagnostics, configured
+**0.4.0b2 is a prerelease.** The 0.4 series adds stream aliases, diagnostics, configured
 chime/recorded-announcement playback, advanced ducking, an optional audio-follow
 blueprint, and experimental Media Player 2 transport/browsing. Media Player 2
 requires separate device-side preparation and credentials; it is off by default.
 See [new controls and setup requirements](docs/MEDIA_AND_AUTOMATION.md).
+0.4.0b2 clarifies the configuration dialog with an alias example and MP2 guidance;
+it does not change playback or routing behavior.
 
 ## Installation With HACS
 
@@ -42,6 +44,11 @@ Then restart Home Assistant.
 ## Configuration
 
 The integration supports UI setup from **Settings > Devices & services**.
+
+Already connected? Open the NAX entry's **Configure** options for
+[friendly AES67 stream names and examples](docs/MEDIA_AND_AUTOMATION.md#friendly-aes67-names)
+or follow the [step-by-step Media Player 2 setup](docs/MEDIA_AND_AUTOMATION.md#optional-media-player-2).
+Media Player 2 is not required for NVX/AES67 routing or friendly stream names.
 
 You will need:
 

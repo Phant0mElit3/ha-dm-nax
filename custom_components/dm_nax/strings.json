@@ -47,7 +47,7 @@
   "options": {
     "step": {
       "init": {
-        "description": "Stream aliases map encoder IP addresses to friendly names. Media Player 2 is optional and requires MP2 mode and a separately created client UUID/secret. This integration never changes device mode or creates credentials. Leave the secret blank to keep the saved value.",
+        "description": "### Friendly AES67 stream names\nGive discovered streams readable labels in Home Assistant only. In **AES67 source IP to friendly name**, enter an encoder-IP-to-name mapping, for example:\n```yaml\n\"192.0.2.10\": \"Apple TV\"\n\"192.0.2.11\": \"Cable\"\n```\nReplace these example IPs with your encoders' IPs, not the NAX IP or multicast addresses. The AES67 Stream dropdown will show `Apple TV [192.0.2.10]`; the zone's Source dropdown still says AES67. Hardware names and routing are unchanged. An empty mapping uses advertised names. Update automations that use exact option labels after renaming.\n\n### Optional Media Player 2\nOnly for the NAX's built-in music players; leave disabled for NVX/AES67. Before enabling, follow the [step-by-step setup guide](https://github.com/Phant0mElit3/ha-dm-nax/blob/main/docs/MEDIA_AND_AUTOMATION.md#optional-media-player-2). The device must already use MP2 and this integration must use HTTPS. Switching to MP2 reboots the NAX. Enter the UUID and Secret from a dedicated device-console `createclient` command, not your web login. Leave the secret blank on later edits to retain it. Enabling this option does not switch modes, create credentials, or configure music accounts.",
         "data": {
           "scan_interval": "Polling interval in seconds",
           "stream_aliases": "AES67 source IP to friendly name",
