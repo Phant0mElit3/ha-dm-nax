@@ -37,6 +37,9 @@ def test_options_help_translation_and_alias_example():
     english = json.loads((integration / "translations/en.json").read_text())
     assert strings == english
     description = english["options"]["step"]["init"]["description"]
+    assert "https://" not in description
+    rendered = description.format(**config_flow._OPTIONS_DESCRIPTION_PLACEHOLDERS)
+    assert "MEDIA_AND_AUTOMATION.md#optional-media-player-2" in rendered
     example = description.partition("```yaml\n")[2].partition("```")[0]
     aliases = yaml.safe_load(example)
     assert isinstance(aliases, dict) and len(aliases) == 2
@@ -68,6 +71,10 @@ async def test_option_validation_preserves_unrelated_settings_and_secret(ctx):
     with patch.object(
         ctx.hass.config_entries, "async_get_known_entry", return_value=ctx.entry
     ):
+        initial = await flow.async_step_init()
+        assert initial["description_placeholders"] == (
+            config_flow._OPTIONS_DESCRIPTION_PLACEHOLDERS
+        )
         result = await flow.async_step_init({"stream_aliases": {"192.0.2.10": " TV "}})
         assert result["data"]["stream_aliases"] == {"192.0.2.10": "TV"}
         assert result["data"]["media_client_secret"] == "preserve"
@@ -80,8 +87,10 @@ async def test_option_validation_preserves_unrelated_settings_and_secret(ctx):
         ):
             result = await flow.async_step_init({"stream_aliases": bad})
             assert result["errors"]["base"] == "invalid_aliases"
+            assert result["description_placeholders"] == initial["description_placeholders"]
         result = await flow.async_step_init({"enable_media_player": True})
         assert result["errors"]["base"] == "invalid_media_credentials"
+        assert result["description_placeholders"] == initial["description_placeholders"]
 
 
 @pytest.mark.asyncio

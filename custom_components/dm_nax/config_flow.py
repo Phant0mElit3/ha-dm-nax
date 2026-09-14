@@ -28,6 +28,13 @@ from .const import (
 )
 from .media import validate_credentials
 
+_OPTIONS_DESCRIPTION_PLACEHOLDERS = {
+    "setup_url": (
+        "https://github.com/Phant0mElit3/ha-dm-nax/blob/main/"
+        "docs/MEDIA_AND_AUTOMATION.md#optional-media-player-2"
+    ),
+}
+
 
 class DmNaxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a DM NAX config flow."""
@@ -160,6 +167,7 @@ class DmNaxOptionsFlow(config_entries.OptionsFlow):
                     step_id="init",
                     data_schema=self._schema(),
                     errors={"base": "invalid_aliases"},
+                    description_placeholders=_OPTIONS_DESCRIPTION_PLACEHOLDERS,
                 )
             data = {**self.config_entry.options, **user_input}
             if not user_input.get("media_client_secret"):
@@ -181,10 +189,15 @@ class DmNaxOptionsFlow(config_entries.OptionsFlow):
                         step_id="init",
                         data_schema=self._schema(),
                         errors={"base": "invalid_media_credentials"},
+                        description_placeholders=_OPTIONS_DESCRIPTION_PLACEHOLDERS,
                     )
             return self.async_create_entry(title="", data=data)
 
-        return self.async_show_form(step_id="init", data_schema=self._schema())
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self._schema(),
+            description_placeholders=_OPTIONS_DESCRIPTION_PLACEHOLDERS,
+        )
 
     def _schema(self):
         current = self.config_entry.options or self.config_entry.data
