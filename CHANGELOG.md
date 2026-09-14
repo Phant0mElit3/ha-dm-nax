@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0b3 (Prerelease)
+
+- Adds an enabled Source select for each output with reported matrix routing and
+  available inputs, visible directly on the Home Assistant device page.
+- Retains NAX-configured names for analog/digital inputs, internal players and
+  AES67. Shares label disambiguation and routing with the existing media player.
+- Keeps existing media-player and AES67 Stream entity IDs and behavior. Source
+  selection does not change volume, mute, receiver streams, or transmit settings.
+- Refreshes source feedback after rejected commands as well as accepted commands;
+  does not optimistically replace the reported selected source.
+- Tests real entity registration, scoped writes, polled feedback, late discovery,
+  source-name changes, duplicate labels and unavailable/unknown input handling.
+- Clarifies Source versus AES67 Stream versus physical output controls in docs.
+
 ## 0.4.0b2 (Prerelease)
 
 - Adds an encoder-IP-to-name example and explains friendly AES67 aliases directly

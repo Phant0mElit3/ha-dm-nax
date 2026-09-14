@@ -2,8 +2,8 @@
 
 ## Prerelease Installation
 
-0.4.0b2 is an opt-in prerelease. In HACS, open the NAX repository's download/version
-dialog and enable prerelease versions if needed, then select 0.4.0b2 and restart
+0.4.0b3 is an opt-in prerelease. In HACS, open the NAX repository's download/version
+dialog and enable prerelease versions if needed, then select 0.4.0b3 and restart
 Home Assistant. Stable 0.3.0 remains available. Existing zone entities and their
 identifiers are retained. No device mode, music account, volume, mute, routing,
 or automatic audio-follow settings are changed during installation.
@@ -12,6 +12,34 @@ The new protocol is tested against a local WebSocket server, not yet a physical
 Media Player 2 installation. Model/firmware capability differences still require
 hardware validation. The existing NVX video and NAX AES67 route changes have been
 confirmed working by the user on the previously documented setup.
+
+## Source and AES67 Stream Selection
+
+Starting with 0.4.0b3, a **<zone name> Source** dropdown appears directly under
+the NAX device's Controls for each output with a reported matrix route and input
+list. This exposes the source selection already available inside the zone media
+player; neither that control nor the existing AES67 Stream entity is removed.
+
+- **Source** selects a reported NAX input: an analog or digital connection, an
+  internal music player, or AES67. Labels use the names configured on the NAX.
+- **AES67 Stream** selects the network feed for that zone's AES67 receiver. The
+  zone must also have AES67 selected as its Source to hear the feed.
+
+For example, choose a turntable's input name under **Living Room Source** to hear
+that analog input. To return to NVX audio, select the desired encoder under
+**Living Room AES67 Stream**, then select **AES67** under **Living Room Source**.
+Selecting an internal player does not start its playback.
+
+Physical outputs are destinations, not additional local inputs. A network feed
+transmitted from an output can appear in AES67 Stream if the NAX discovers it;
+the integration does not create routes from guessed output names. Line Out
+controls remain attached to the zones that report line-output support.
+
+The two source controls share the same input labels and matrix command. Selection
+changes only the reported route, then refreshes device feedback. It does not
+change volume, mute, the receiver's saved stream, or transmitter configuration.
+No route is changed by installation or entity discovery. Crestron Home or another
+controller can still change the same hardware route; HA reflects polled state.
 
 ## Friendly AES67 Names
 

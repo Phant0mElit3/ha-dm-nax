@@ -8,13 +8,14 @@ custom HACS repository until more models and firmware versions have been tested.
 
 Tested live against a `DM-NAX-8ZSA` running firmware `3.2.0121.01081`.
 
-**0.4.0b2 is a prerelease.** The 0.4 series adds stream aliases, diagnostics, configured
+**0.4.0b3 is a prerelease.** The 0.4 series adds stream aliases, diagnostics, configured
 chime/recorded-announcement playback, advanced ducking, an optional audio-follow
 blueprint, and experimental Media Player 2 transport/browsing. Media Player 2
 requires separate device-side preparation and credentials; it is off by default.
 See [new controls and setup requirements](docs/MEDIA_AND_AUTOMATION.md).
-0.4.0b2 clarifies the configuration dialog with an alias example and MP2 guidance;
-it does not change playback or routing behavior.
+0.4.0b3 adds a visible **Source** dropdown for each routable zone alongside
+**AES67 Stream**, using the NAX's input names. The configuration dialog also
+includes a friendly-name example and MP2 guidance.
 
 ## Installation With HACS
 
@@ -76,6 +77,8 @@ flow without deleting the integration or its entities.
 - Audio ranges from `/Device/AudioRanges`
 - Source routing from `/Device/AvMatrixRouting`
 - Zone media players with volume, mute, source list, and source select
+- Enabled zone **Source** dropdowns for direct selection of reported analog,
+  digital, internal-player, and AES67 inputs without opening media-player details
 - Separate AES67 Stream selectors for independent zones with reported receive mappings
 - Zone name text entities, enabled under the device's configuration controls
 - Optimistic Home Assistant volume state after accepted volume commands
@@ -112,7 +115,8 @@ flow without deleting the integration or its entities.
 
 ## Selecting AES67 Streams
 
-The media player's **AES67** source chooses the network-audio input; it does
+The zone's **Source** dropdown (or media-player source control) chooses the input.
+Its **AES67** option chooses the network-audio input; it does
 not identify which stream to receive. Version 0.3.0 adds an **AES67 Stream**
 select for each supported zone, such as **Living Room AES67 Stream**.
 Dropdown labels include the advertised source IP when available. NVX audio
@@ -120,7 +124,8 @@ session names may look like `Stream01...` instead of the encoder's video name;
 use the source IP to identify the corresponding encoder.
 
 1. Choose the encoder's advertised audio session in the zone's **AES67 Stream** select.
-2. Select **AES67** in that zone media player's source list to hear it.
+2. Select **AES67** in the zone's **Source** dropdown to hear it. The source
+   control inside the zone media player remains available too.
 
 These controls are separate deliberately: preparing an AES67 subscription does
 not change a zone playing music from another input. Volume and mute remain

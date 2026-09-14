@@ -32,6 +32,7 @@ from .controls import (
 )
 from .coordinator import DmNaxCoordinator
 from .entity import DmNaxEntity
+from .sources import async_select_source, source_labels, source_name
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -123,6 +124,7 @@ async def async_setup_entry(
         coordinator, entry, async_add_entities, SELECT_DESCRIPTIONS, DmNaxZoneSelect
     )
     seen: set[str] = set()
+    source_seen: set[str] = set()
 
     @callback
     def discover_stream_selects():
@@ -130,6 +132,14 @@ async def async_setup_entry(
         entities = []
         for item in data.get("output_channels", []):
             key = str(item.get("id"))
+            if (
+                item.get("id") is not None
+                and key not in source_seen
+                and item.get("route_id") is not None
+                and source_labels(data)
+            ):
+                source_seen.add(key)
+                entities.append(DmNaxSourceSelect(coordinator, item))
             if (
                 item.get("id") is not None
                 and key not in seen
@@ -142,6 +152,45 @@ async def async_setup_entry(
 
     discover_stream_selects()
     entry.async_on_unload(coordinator.async_add_listener(discover_stream_selects))
+
+
+class DmNaxSourceSelect(DmNaxEntity, SelectEntity):
+    """Expose the zone's matrix input selection directly on the device page."""
+
+    _attr_icon = "mdi:audio-input-rca"
+
+    def __init__(self, coordinator, item):
+        super().__init__(coordinator, item)
+        self._attr_unique_id += "_source"
+
+    @property
+    def name(self):
+        return f"{super().name} Source"
+
+    @property
+    def available(self):
+        return (
+            super().available
+            and self.item.get("route_id") is not None
+            and bool(self.options)
+        )
+
+    @property
+    def options(self):
+        return list(source_labels(self.coordinator.data).values())
+
+    @property
+    def current_option(self):
+        source_id = self.item.get("source_id")
+        if source_id is None:
+            return None
+        label = source_name(self.coordinator.data, str(source_id))
+        return label if label in self.options else None
+
+    async def async_select_option(self, option):
+        if not self.available:
+            raise HomeAssistantError("DM NAX source routing is unavailable")
+        await async_select_source(self.coordinator, self.item, option)
 
 
 class DmNaxAes67StreamSelect(DmNaxEntity, SelectEntity):

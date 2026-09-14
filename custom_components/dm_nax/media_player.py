@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from collections import Counter
 from time import monotonic
 from typing import Any
 
@@ -22,6 +21,7 @@ from .api import DmNaxApiError
 from .const import DOMAIN
 from .coordinator import DmNaxCoordinator
 from .entity import DmNaxEntity
+from .sources import async_select_source, source_labels, source_name
 from .stream_player import setup_players
 
 DM_NAX_VOLUME_MAX = 1000
@@ -122,27 +122,8 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
 
     @property
     def _source_labels(self) -> dict[str, str]:
-        """Disambiguate duplicate names without collisions with literal labels."""
-        items = [
-            item
-            for item in self.coordinator.data.get("input_channels", [])
-            if item.get("id") is not None
-        ]
-        counts = Counter(_input_name(item) for item in items)
-        labels = {}
-        reserved = {
-            _input_name(item) for item in items if counts[_input_name(item)] == 1
-        }
-        for item in items:
-            source_id, name = str(item["id"]), _input_name(item)
-            label = name
-            if counts[name] > 1:
-                label = f"{name} ({source_id})"
-                while label in reserved:
-                    label += f" ({source_id})"
-            reserved.add(label)
-            labels[source_id] = label
-        return labels
+        """Use the same labels as the dedicated Source select."""
+        return source_labels(self.coordinator.data)
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set output volume within both HA and device bounds."""
@@ -180,29 +161,11 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
 
     async def async_select_source(self, source: str) -> None:
         """Select an input source for this output."""
-        source_id = self._source_id_for_name(source)
-        if source_id is None:
-            raise HomeAssistantError(f"Unknown DM NAX source: {source}")
-        route_id = self.item.get("route_id")
-        if route_id is None:
-            raise HomeAssistantError("DM NAX does not report a route for this output")
-        try:
-            await self.coordinator.api.async_set_audio_source(str(route_id), source_id)
-        except DmNaxApiError as err:
-            raise HomeAssistantError(f"DM NAX source command failed: {err}") from err
-        await self.coordinator.async_request_refresh()
-
-    def _source_id_for_name(self, name: str) -> str | None:
-        """Return a route source id for a Home Assistant source name."""
-        return next(
-            (key for key, label in self._source_labels.items() if label == name), None
-        )
+        await async_select_source(self.coordinator, self.item, source)
 
     def _source_name_for_id(self, source_id: str) -> str | None:
         """Use the same label for feedback and selection, including source aliases."""
-        source = self.coordinator.data.get("inputs_by_source_id", {}).get(source_id)
-        key = str(source["id"]) if source else source_id
-        return self._source_labels.get(key, source_id)
+        return source_name(self.coordinator.data, source_id) or source_id
 
     def _handle_coordinator_update(self) -> None:
         """Clear optimistic volume once DM NAX confirms it or the override expires."""
@@ -251,11 +214,6 @@ class DmNaxOutputChannel(DmNaxEntity, MediaPlayerEntity):
     async def async_will_remove_from_hass(self) -> None:
         self._clear_optimistic_volume()
         await super().async_will_remove_from_hass()
-
-
-def _input_name(item: dict[str, Any]) -> str:
-    """Return a display name for an input channel."""
-    return str(item.get("Name") or item.get("name") or item.get("id"))
 
 
 def _bounded_volume(value: float) -> float:
